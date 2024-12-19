@@ -16,18 +16,38 @@ endif()
 
 SET(OPENWQ_DIR ${CMAKE_CURRENT_SOURCE_DIR}/openwq CACHE INTERNAL "OPENWQ_DIR")
 FILE(GLOB OPENWQ_SOURCES 
-          ${OPENWQ_DIR}/src/*.cpp 
-          ${OPENWQ_DIR}/src/global/*.cpp
-          ${OPENWQ_DIR}/src/extwatflux_ss/*.cpp
-          ${OPENWQ_DIR}/src/initiate/*.cpp
-          ${OPENWQ_DIR}/src/chem/*.cpp
-          ${OPENWQ_DIR}/src/watertransp/*.cpp
-          ${OPENWQ_DIR}/src/readjson/*.cpp
-          ${OPENWQ_DIR}/src/couplercalls/*.cpp
-          ${OPENWQ_DIR}/src/output/*.cpp
-          ${OPENWQ_DIR}/src/solver/*.cpp
-          ${OPENWQ_DIR}/src/units/*.cpp
-          ${OPENWQ_DIR}/src/utils/*.cpp)
+    ${OPENWQ_DIR}/src/*.cpp 
+    ${OPENWQ_DIR}/src/global/*.cpp
+    ${OPENWQ_DIR}/src/extwatflux_ss/*.cpp
+    ${OPENWQ_DIR}/src/extwatflux_ss/json_SetConfigInfo/*.cpp
+    ${OPENWQ_DIR}/src/initiate/*.cpp
+    ${OPENWQ_DIR}/src/readjson/*.cpp
+    ${OPENWQ_DIR}/src/readjson/json_utils/*.cpp
+    ${OPENWQ_DIR}/src/couplercalls/*.cpp
+    ${OPENWQ_DIR}/src/output/*.cpp
+    ${OPENWQ_DIR}/src/output/json_SetConfigInfo/*.cpp
+    ${OPENWQ_DIR}/src/compute/*.cpp
+    ${OPENWQ_DIR}/src/compute/json_SetConfigInfo/*.cpp
+    ${OPENWQ_DIR}/src/compute/solver_backeuler/*.cpp
+    ${OPENWQ_DIR}/src/compute/solver_sundials/*.cpp
+    ${OPENWQ_DIR}/src/units/*.cpp
+    ${OPENWQ_DIR}/src/utils/*.cpp
+    ${OPENWQ_DIR}/src/utils/models_toolbox/*.cpp
+    ${OPENWQ_DIR}/src/models_CH/*.cpp
+    ${OPENWQ_DIR}/src/models_CH/bgc_flex/*.cpp
+    ${OPENWQ_DIR}/src/models_TD/*.cpp
+    ${OPENWQ_DIR}/src/models_TD/native_adv/*.cpp
+    ${OPENWQ_DIR}/src/models_TD/native_advdisp/*.cpp
+    ${OPENWQ_DIR}/src/models_LE/*.cpp
+    ${OPENWQ_DIR}/src/models_LE/native_boundmix/*.cpp
+    ${OPENWQ_DIR}/src/models_SI/*.cpp
+    ${OPENWQ_DIR}/src/models_SI/langmuir/*.cpp
+    ${OPENWQ_DIR}/src/models_SI/freundlich/*.cpp
+    ${OPENWQ_DIR}/src/models_TS/*.cpp
+    ${OPENWQ_DIR}/src/models_TS/hype_hvb/*.cpp
+    ${OPENWQ_DIR}/src/models_TS/hype_mmf/*.cpp
+    ${OPENWQ_INTERFACE_DIR}/OpenWQ_hydrolink.cpp
+    ${OPENWQ_INTERFACE_DIR}/OpenWQ_interface.cpp)
 
 SET(OPENWQ_INCLUDES ${OPENWQ_DIR}/src/ CACHE INTERNAL "OPENWQ_INCLUDES")
 

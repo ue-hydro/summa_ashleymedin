@@ -14,20 +14,26 @@
 #ifndef OPENWQ_HYDROLINK_INCLUDED
 #define OPENWQ_HYDROLINK_INCLUDED
 
-#include "couplercalls/OpenWQ_couplercalls.hpp"
-#include "global/OpenWQ_hostModelconfig.hpp"
-#include "global/OpenWQ_json.hpp"
-#include "global/OpenWQ_wqconfig.hpp"
-#include "global/OpenWQ_vars.hpp"
-#include "readjson/OpenWQ_readjson.hpp"
-#include "initiate/OpenWQ_initiate.hpp"
-#include "chem/OpenWQ_chem.hpp"
-#include "watertransp/OpenWQ_watertransp.hpp"
-#include "extwatflux_ss/OpenWQ_extwatflux_ss.hpp"
-#include "units/OpenWQ_units.hpp"
-#include "utils/OpenWQ_utils.hpp"
-#include "solver/OpenWQ_solver.hpp"
-#include "output/OpenWQ_output.hpp"
+#include "global/openwq_hostmodelconfig.hpp"
+#include "global/openwq_json.hpp"
+#include "global/openwq_wqconfig.hpp"
+#include "global/openwq_vars.hpp"
+
+#include "couplercalls/headerfile_CC.hpp"
+#include "readjson/headerfile_nlohmann.hpp"
+#include "initiate/headerfile_INIT.hpp"
+#include "extwatflux_ss/headerfile_EWF_SS.hpp"
+#include "units/headerfile_UNITS.hpp"
+#include "utils/headerfile_UTILS.hpp"
+#include "compute/headerfile_compute.hpp"
+#include "output/headerfile_OUT.hpp"
+
+#include "models_CH/headerfile_CH.hpp"
+#include "models_TD/headerfile_TD.hpp"
+#include "models_LE/headerfile_LE.hpp"
+#include "models_SI/headerfile_SI.hpp"
+#include "models_TS/headerfile_TS.hpp"
+
 #include <iostream>
 #include <time.h>
 #include <vector>
@@ -47,6 +53,7 @@ class CLASSWQ_openwq
     // Instance Variables
     private:
 
+        // General
         std::unique_ptr<OpenWQ_hostModelconfig> OpenWQ_hostModelconfig_ref =
             std::make_unique<OpenWQ_hostModelconfig>();
         std::unique_ptr<OpenWQ_couplercalls> OpenWQ_couplercalls_ref =
@@ -63,18 +70,27 @@ class CLASSWQ_openwq
             std::make_unique<OpenWQ_readjson>();
         std::unique_ptr<OpenWQ_initiate> OpenWQ_initiate_ref = 
             std::make_unique<OpenWQ_initiate>();
-        std::unique_ptr<OpenWQ_watertransp> OpenWQ_watertransp_ref = 
-            std::make_unique<OpenWQ_watertransp>();
-        std::unique_ptr<OpenWQ_chem> OpenWQ_chem_ref = 
-            std::make_unique<OpenWQ_chem>();
         std::unique_ptr<OpenWQ_extwatflux_ss> OpenWQ_extwatflux_ss_ref = 
             std::make_unique<OpenWQ_extwatflux_ss>();
-        std::unique_ptr<OpenWQ_solver> OpenWQ_solver_ref = 
-            std::make_unique<OpenWQ_solver>();
+        std::unique_ptr<OpenWQ_compute> OpenWQ_solver_ref = 
+            std::make_unique<OpenWQ_compute>();
         std::unique_ptr<OpenWQ_output> OpenWQ_output_ref = 
             std::make_unique<OpenWQ_output>();
 
+        // Vars
         std::unique_ptr<OpenWQ_vars> OpenWQ_vars_ref; // Requires input from summa 
+
+        // Models
+        std::unique_ptr<OpenWQ_TD_model> OpenWQ_TD_model_ref = 
+            std::make_unique<OpenWQ_TD_model>();
+        std::unique_ptr<OpenWQ_LE_model> OpenWQ_LE_model_ref = 
+            std::make_unique<OpenWQ_LE_model>();
+        std::unique_ptr<OpenWQ_CH_model> OpenWQ_CH_model_ref = 
+            std::make_unique<OpenWQ_CH_model>();
+        std::unique_ptr<OpenWQ_SI_model> OpenWQ_SI_model_ref = 
+            std::make_unique<OpenWQ_SI_model>();
+        std::unique_ptr<OpenWQ_TS_model> OpenWQ_TS_model_ref = 
+            std::make_unique<OpenWQ_TS_model>();
 
         int num_HRU;
         const float *hru_area;

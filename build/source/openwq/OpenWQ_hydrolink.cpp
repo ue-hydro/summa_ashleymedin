@@ -1,4 +1,4 @@
-// Copyright 2020, Diogo Costa, diogo.pinhodacosta@canada.ca
+// Copyright 2020, Diogo Costa, diogo.costa@uevora.pt
 // This file is part of OpenWQ model.
 
 // This program, openWQ, is free software: you can redistribute it and/or modify
@@ -54,7 +54,6 @@ int CLASSWQ_openwq::decl(
             OpenWQ_hostModelconfig_ref->get_num_HydroComp(),
             OpenWQ_hostModelconfig_ref->get_num_HydroExtFlux());
 
-        
         // Dependencies
         // to expand BGC modelling options
         OpenWQ_hostModelconfig_ref->add_HydroDepend(0,"SM",        num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
@@ -110,8 +109,11 @@ int CLASSWQ_openwq::decl(
             *OpenWQ_readjson_ref,            // read json files
             *OpenWQ_vars_ref,
             *OpenWQ_initiate_ref,            // initiate modules
-            *OpenWQ_watertransp_ref,         // transport modules
-            *OpenWQ_chem_ref,                // biochemistry modules
+            *OpenWQ_TD_model_ref,         // transport modules
+            *OpenWQ_LE_model_ref,            // LE_model_ model
+            *OpenWQ_CH_model_ref,                // biochemistry modules
+            *OpenWQ_SI_model_ref,
+            *OpenWQ_TS_model_ref,
             *OpenWQ_extwatflux_ss_ref,       // sink and source modules)
             *OpenWQ_output_ref);
             
@@ -175,8 +177,11 @@ int CLASSWQ_openwq::openwq_run_time_start(
             *OpenWQ_readjson_ref,            // read json files
             *OpenWQ_vars_ref,
             *OpenWQ_initiate_ref,            // initiate modules
-            *OpenWQ_watertransp_ref,         // transport modules
-            *OpenWQ_chem_ref,                // biochemistry modules
+            *OpenWQ_TD_model_ref,         // transport modules
+            *OpenWQ_LE_model_ref,
+            *OpenWQ_CH_model_ref,                // biochemistry modules
+            *OpenWQ_SI_model_ref,
+            *OpenWQ_TS_model_ref,
             *OpenWQ_extwatflux_ss_ref,          // sink and source modules)
             *OpenWQ_solver_ref,
             *OpenWQ_output_ref,
@@ -193,9 +198,13 @@ int CLASSWQ_openwq::openwq_run_space(
     double wflux_s2r, double wmass_source) {
 
     // Convert Fortran Index to C++ index
-    ix_s -= 1; iy_s -= 1; iz_s -= 1;
-    ix_r -= 1; iy_r -= 1; iz_r -= 1;
-
+    // But if -1 (loss), the conversion doesn't make sense
+    ix_s = std::max(-1, ix_s - 1);
+    iy_s = std::max(-1, iy_s - 1);
+    iz_s = std::max(-1, iz_s - 1);
+    ix_r = std::max(-1, ix_r - 1);
+    iy_r = std::max(-1, iy_r - 1);
+    iz_r = std::max(-1, iz_r - 1);
    
     time_t simtime = OpenWQ_units_ref->convertTime_ints2time_t(
         *OpenWQ_wqconfig_ref,
@@ -215,8 +224,11 @@ int CLASSWQ_openwq::openwq_run_space(
         *OpenWQ_readjson_ref,            // read json files
         *OpenWQ_vars_ref,
         *OpenWQ_initiate_ref,            // initiate modules
-        *OpenWQ_watertransp_ref,         // transport modules
-        *OpenWQ_chem_ref,                // biochemistry modules
+        *OpenWQ_TD_model_ref,         // transport modules
+        *OpenWQ_TS_model_ref,
+        *OpenWQ_LE_model_ref,            // LE_model_ model
+        *OpenWQ_CH_model_ref,                // biochemistry modules
+        *OpenWQ_SI_model_ref,
         *OpenWQ_extwatflux_ss_ref,       // sink and source modules
         *OpenWQ_solver_ref,
         *OpenWQ_output_ref,
@@ -255,8 +267,9 @@ int CLASSWQ_openwq::openwq_run_space_in(
         *OpenWQ_readjson_ref,
         *OpenWQ_vars_ref,
         *OpenWQ_initiate_ref,
-        *OpenWQ_watertransp_ref,
-        *OpenWQ_chem_ref,
+        *OpenWQ_TD_model_ref,
+        *OpenWQ_CH_model_ref,
+        *OpenWQ_TS_model_ref,
         *OpenWQ_extwatflux_ss_ref,
         *OpenWQ_solver_ref,
         *OpenWQ_output_ref,
@@ -290,8 +303,11 @@ int CLASSWQ_openwq::openwq_run_time_end(
         *OpenWQ_readjson_ref,            // read json files
         *OpenWQ_vars_ref,
         *OpenWQ_initiate_ref,            // initiate modules
-        *OpenWQ_watertransp_ref,         // transport modules
-        *OpenWQ_chem_ref,                // biochemistry modules
+        *OpenWQ_TD_model_ref,         // transport modules
+        *OpenWQ_LE_model_ref,
+        *OpenWQ_CH_model_ref,                // biochemistry modules
+        *OpenWQ_SI_model_ref,
+        *OpenWQ_TS_model_ref,
         *OpenWQ_extwatflux_ss_ref,          // sink and source modules)
         *OpenWQ_solver_ref,
         *OpenWQ_output_ref,
