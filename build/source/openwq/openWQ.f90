@@ -41,7 +41,8 @@ module openwq
       nSoil_2openwq,             & ! num layers of snoil (variable)
       nRunoff_2openwq,           & ! num layers of runoff (fixed to 1)
       nAquifer_2openwq,          & ! num layers of aquifer (fixed to 1)
-      nYdirec_2openwq)                 ! num of layers in y-dir (set to 1 because not used in summa)
+      nYdirec_2openwq,           &
+      hruId)                 ! num of layers in y-dir (set to 1 because not used in summa)
       
       implicit none
       class(CLASSWQ_openwq) :: this
@@ -51,8 +52,8 @@ module openwq
       integer(i4b), intent(in) :: nSoil_2openwq
       integer(i4b), intent(in) :: nRunoff_2openwq
       integer(i4b), intent(in) :: nAquifer_2openwq
-      
       integer(i4b), intent(in) :: nYdirec_2openwq
+      real(dp),     intent(in) :: hruId(num_hru)
 
       openWQ_init = openwq_decl_c(  &
          this%ptr,                  & ! openwq object
@@ -62,7 +63,8 @@ module openwq
          nSoil_2openwq,             & ! num layers of snoil (variable)
          nRunoff_2openwq,           & ! num layers of runoff (fixed to 1)
          nAquifer_2openwq,          & ! num layers of aquifer (fixed to 1)
-         nYdirec_2openwq)                 ! num of layers in y-dir (set to 1 because not used in summa)
+         nYdirec_2openwq,           & ! num of layers in y-dir (set to 1 because not used in summa)
+         hruId)                 
 
    end function
 

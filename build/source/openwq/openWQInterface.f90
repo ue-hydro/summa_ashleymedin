@@ -21,7 +21,8 @@ interface
         nSoil_2openwq,          &
         nRunoff_2openwq,        &
         nAquifer_2openwq,       &
-        y_direction) bind(C, name="openwq_decl")
+        y_direction,            &
+        hruId) bind(C, name="openwq_decl")
 
         use iso_c_binding
         implicit none
@@ -34,6 +35,7 @@ interface
         integer(c_int), intent(in), value  :: nAquifer_2openwq
         integer(c_int), intent(in), value  :: nRunoff_2openwq
         integer(c_int), intent(in), value  :: y_direction
+        real(c_double), intent(in) :: hruId(num_hru)
 
     end function
 

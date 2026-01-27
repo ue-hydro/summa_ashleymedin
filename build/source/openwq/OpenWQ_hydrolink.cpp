@@ -30,9 +30,11 @@ int CLASSWQ_openwq::decl(
     int nSoil_2openwq,        // num layers of snoil (variable)
     int nRunoff_2openwq,      // num layers in the runoff of SUMMA
     int nAquifer_2openwq,     // num layers of aquifer (fixed to 1)
-    int nYdirec_2openwq){     // num of layers in y-dir (set to 1 because not used in summa)
+    int nYdirec_2openwq,       // num of layers in y-dir (set to 1 because not used in summa)
+    double hruId[]){     
 
     this->num_HRU = num_HRU;
+    this->hruId = hruId;
     std::string msg_string;                 // interactive message to print
 
     if (OpenWQ_hostModelconfig_ref->get_num_HydroComp()==0) {
@@ -59,46 +61,12 @@ int CLASSWQ_openwq::decl(
         OpenWQ_hostModelconfig_ref->add_HydroDepend(0,"SM",        num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
         OpenWQ_hostModelconfig_ref->add_HydroDepend(1,"Tair_K",    num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
         OpenWQ_hostModelconfig_ref->add_HydroDepend(2,"Tsoil_K",   num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
+        
+        // Mapping summa element ids (HRUs) to OpenWQ elements
+        // in summa it's named reachID
+        OpenWQ_hostModelconfig_ref->set_cellid_to_wqlabel("hruId");
 
-        // Master Json
-        // read location from file: openwq_mainJSONFile_fullPath.txt
-        std::string master_json; //string
-        std::fstream fileStream; //file stream object
-        fileStream.open("openwq_mainJSONFile_fullPath.txt"); //open your word list
-
-        // check if openwq_mainJSONFile_fullPath.txt exists
-        if (!fileStream) {
-
-            // Create Error Message
-            msg_string = 
-                "<OpenWQ> ERROR: The 'openwq_mainJSONFile_fullPath.txt' has not been found. This file needs to exist in the directory where the openWQ executable is located, and it needs to contain the full path to the main/entry input file for OpenWQ. The simulation aborted has been!";
-
-            // Print it (Console and/or Log file)
-            std::cout << msg_string << std::endl;
-
-            exit(EXIT_FAILURE);
-
-        // if yes, get the master file fullpath and check if it also exists
-        }else{
-            // read openwq master file location
-            std::getline(fileStream, master_json); 
-
-            // Check if master file exists
-            if (!std::filesystem::exists(master_json)) {
-            
-                // Create Error Message
-                msg_string = 
-                "<OpenWQ> ERROR: The full path to the main/entry input file for OpenWQ that is provided in 'openwq_mainJSONFile_fullPath.txt' has not been found. The simulation aborted has been!";
-
-                // Print it (Console and/or Log file)
-                std::cout << msg_string << std::endl;
-
-                exit(EXIT_FAILURE);
-            }
-
-        }
-
-        OpenWQ_wqconfig_ref->set_OpenWQ_masterjson(master_json);
+        OpenWQ_wqconfig_ref->set_OpenWQ_masterjson("openWQ_master.json");
 
         OpenWQ_couplercalls_ref->InitialConfig(
             *OpenWQ_hostModelconfig_ref,
@@ -116,7 +84,17 @@ int CLASSWQ_openwq::decl(
             *OpenWQ_TS_model_ref,
             *OpenWQ_extwatflux_ss_ref,       // sink and source modules)
             *OpenWQ_output_ref);
+
+        // Set cellid_to_wq values for referecing hostmodel element ids in openwq outputs
+        for (int cmp = 0; cmp < OpenWQ_hostModelconfig_ref->get_num_HydroComp(); cmp++) {
+  
+            for (int x = 0; x < num_HRU; x++) {
+
+                OpenWQ_hostModelconfig_ref->set_cellid_to_wq_at(cmp,x,0,0,hruId[x]);
+
+            }
             
+        }
     }
     return 0;
 }

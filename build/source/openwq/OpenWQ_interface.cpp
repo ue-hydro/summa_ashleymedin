@@ -23,7 +23,8 @@ int openwq_decl(
     int nSoil_2openwq,        // num layers of snoil (variable)
     int nRunoff_2openwq,      // num layers of runoff (fixed to 1)
     int nAquifer_2openwq,     // num layers of aquifer (fixed to 1)
-    int nYdirec_2openwq){            // num of layers in y-dir (set to 1 because not used in summa)
+    int nYdirec_2openwq,      // num of layers in y-dir (set to 1 because not used in summa)
+    double hruId[]){            
 
     return openWQ->decl(
         hruCount, 
@@ -32,7 +33,8 @@ int openwq_decl(
         nSoil_2openwq, 
         nRunoff_2openwq,
         nAquifer_2openwq, 
-        nYdirec_2openwq);
+        nYdirec_2openwq,
+        hruId);
 
 }
 

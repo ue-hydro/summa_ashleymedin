@@ -31,6 +31,8 @@ subroutine openwq_init(err)
 
   ! local variables
   integer(i4b)                                    :: hruCount
+  integer(i4b)                                    :: hru_i
+  integer(i4b), dimension(:), allocatable  :: hruId
   integer(i4b)                                    :: nSoil
   ! OpenWQ dimensions
   integer(i4b)                                    :: nCanopy_2openwq =  1    ! Canopy has only 1 layer
@@ -49,6 +51,13 @@ subroutine openwq_init(err)
 
   nSoil = maxLayers - maxSnowLayers
 
+  ! Save HRU IDs into an array for passing to openWQ
+
+  allocate(hruId(hruCount)) ! ! Allocate the array
+  do hru_i = 1, size(gru_struc)
+    hruId(hru_i) = gru_struc(hru_i)%gru_id
+  end do
+
   ! intialize openWQ
   err=openwq_obj%decl(    &
     hruCount,             & ! num HRU
@@ -57,7 +66,8 @@ subroutine openwq_init(err)
     nSoil,                & ! num layers of snoil (variable)
     nRunoff_2openwq,      & ! num layers of runoff (fixed to 1)
     nAquifer_2openwq,     & ! num layers of aquifer (fixed to 1)
-    nYdirec_2openwq)             ! num of layers in y-dir (set to 1 because not used in summa)
+    nYdirec_2openwq,    & ! num of layers in y-dir (set to 1 because not used in summa)
+    real(hruId,dp))            
 
   
   ! Create copy of state information, needed for passing to openWQ with fluxes that require
