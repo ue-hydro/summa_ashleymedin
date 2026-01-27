@@ -86,11 +86,24 @@ int CLASSWQ_openwq::decl(
             *OpenWQ_output_ref);
 
         // Set cellid_to_wq values for referecing hostmodel element ids in openwq outputs
+        std::vector<int> zdimension_cmp = {
+            nCanopy_2openwq,
+            max_snow_layers,
+            nRunoff_2openwq,
+            nSoil_2openwq,
+            nAquifer_2openwq
+        };
         for (int cmp = 0; cmp < OpenWQ_hostModelconfig_ref->get_num_HydroComp(); cmp++) {
-  
+            
             for (int x = 0; x < num_HRU; x++) {
 
-                OpenWQ_hostModelconfig_ref->set_cellid_to_wq_at(cmp,x,0,0,std::to_string(static_cast<long long>(hruId[x])));
+                for (int z = 0; z < zdimension_cmp[cmp]; z++){
+
+                OpenWQ_hostModelconfig_ref->set_cellid_to_wq_at(
+                    cmp,x,0,z,
+                    std::to_string(static_cast<long long>(hruId[x])) + "_z" + std::to_string(z+1));
+                
+            }
 
             }
             
