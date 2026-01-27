@@ -35,7 +35,7 @@ interface
         integer(c_int), intent(in), value  :: nAquifer_2openwq
         integer(c_int), intent(in), value  :: nRunoff_2openwq
         integer(c_int), intent(in), value  :: y_direction
-        real(c_double), intent(in) :: hruId(num_hru)
+        integer(c_long_long), intent(in) :: hruId(num_hru)
 
     end function
 

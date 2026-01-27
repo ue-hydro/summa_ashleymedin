@@ -32,7 +32,7 @@ subroutine openwq_init(err)
   ! local variables
   integer(i4b)                                    :: hruCount
   integer(i4b)                                    :: hru_i
-  integer(i4b), dimension(:), allocatable  :: hruId
+  integer(i8b), dimension(:), allocatable  :: hruId
   integer(i4b)                                    :: nSoil
   ! OpenWQ dimensions
   integer(i4b)                                    :: nCanopy_2openwq =  1    ! Canopy has only 1 layer
@@ -67,7 +67,7 @@ subroutine openwq_init(err)
     nRunoff_2openwq,      & ! num layers of runoff (fixed to 1)
     nAquifer_2openwq,     & ! num layers of aquifer (fixed to 1)
     nYdirec_2openwq,    & ! num of layers in y-dir (set to 1 because not used in summa)
-    real(hruId,dp))            
+    hruId)            
 
   
   ! Create copy of state information, needed for passing to openWQ with fluxes that require

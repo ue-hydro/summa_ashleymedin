@@ -53,7 +53,7 @@ module openwq
       integer(i4b), intent(in) :: nRunoff_2openwq
       integer(i4b), intent(in) :: nAquifer_2openwq
       integer(i4b), intent(in) :: nYdirec_2openwq
-      real(dp),     intent(in) :: hruId(num_hru)
+      integer(c_long_long), intent(in) :: hruId(num_hru)
 
       openWQ_init = openwq_decl_c(  &
          this%ptr,                  & ! openwq object

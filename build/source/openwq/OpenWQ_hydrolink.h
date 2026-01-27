@@ -94,7 +94,7 @@ class CLASSWQ_openwq
 
         int num_HRU;
         const float *hru_area;
-        double *hruId;
+        long long *hruId;
 
     // Constructor
     public:
@@ -114,7 +114,7 @@ class CLASSWQ_openwq
         int nRunoff_2openwq,      // num layers of runoff (fixed to 1)
         int nAquifer_2openwq,     // num layers of aquifer (fixed to 1)
         int nYdirec_2openwq,       //  // num of layers in y-dir (set to 1 because not used in summa)
-        double hruId[]);          
+        long long hruId[]);          
 
     int openwq_run_time_start(
         bool last_hru_flag,
