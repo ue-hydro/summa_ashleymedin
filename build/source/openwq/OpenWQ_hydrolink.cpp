@@ -63,8 +63,39 @@ int CLASSWQ_openwq::decl(
         OpenWQ_hostModelconfig_ref->add_HydroDepend(2,"Tsoil_K",   num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
         
         // Mapping summa element ids (HRUs) to OpenWQ elements
-        // in summa it's named reachID
+        // in summa it's named hruId
         OpenWQ_hostModelconfig_ref->set_cellid_to_wqlabel("hruId");
+
+        // Set cellid_to_wq values for referencing hostmodel element ids in openwq outputs
+        // IMPORTANT: This must be done BEFORE InitialConfig() so that SS/EWF JSON files
+        // can use cell_id strings (e.g., "123456_z1") instead of (ix, iy, iz) indices
+        std::vector<int> zdimension_cmp = {
+            nCanopy_2openwq,
+            max_snow_layers,
+            nRunoff_2openwq,
+            nSoil_2openwq,
+            nAquifer_2openwq
+        };
+        for (int cmp = 0; cmp < OpenWQ_hostModelconfig_ref->get_num_HydroComp(); cmp++) {
+
+            // First, allocate the 3D structure for this compartment
+            arma::Cube<double> domain_xyz(num_HRU, nYdirec_2openwq, zdimension_cmp[cmp]);
+            OpenWQ_hostModelconfig_ref->set_cellid_to_wq_size(domain_xyz);
+
+            // Then set the cell_id values
+            for (int x = 0; x < num_HRU; x++) {
+
+                for (int z = 0; z < zdimension_cmp[cmp]; z++){
+
+                OpenWQ_hostModelconfig_ref->set_cellid_to_wq_at(
+                    cmp,x,0,z,
+                    std::to_string(static_cast<long long>(hruId[x])) + "_z" + std::to_string(z+1));
+
+            }
+
+            }
+
+        }
 
         OpenWQ_wqconfig_ref->set_OpenWQ_masterjson("openWQ_master.json");
 
@@ -84,30 +115,6 @@ int CLASSWQ_openwq::decl(
             *OpenWQ_TS_model_ref,
             *OpenWQ_extwatflux_ss_ref,       // sink and source modules)
             *OpenWQ_output_ref);
-
-        // Set cellid_to_wq values for referecing hostmodel element ids in openwq outputs
-        std::vector<int> zdimension_cmp = {
-            nCanopy_2openwq,
-            max_snow_layers,
-            nRunoff_2openwq,
-            nSoil_2openwq,
-            nAquifer_2openwq
-        };
-        for (int cmp = 0; cmp < OpenWQ_hostModelconfig_ref->get_num_HydroComp(); cmp++) {
-            
-            for (int x = 0; x < num_HRU; x++) {
-
-                for (int z = 0; z < zdimension_cmp[cmp]; z++){
-
-                OpenWQ_hostModelconfig_ref->set_cellid_to_wq_at(
-                    cmp,x,0,z,
-                    std::to_string(static_cast<long long>(hruId[x])) + "_z" + std::to_string(z+1));
-                
-            }
-
-            }
-            
-        }
     }
     return 0;
 }
