@@ -568,29 +568,18 @@ subroutine openwq_run_space_step(summa1_struc)
                                     wmass_source)
         
         ! ====================================================
-        ! 1.3 canopy -> OUT (lost from model) (Evap + Subl)
+        ! 1.3 canopy -> OUT (Transp + Evap + Subl) - NO MASS TRANSPORT
         ! ====================================================
-        ! *Source*:
-        ! canopy (only 1 z layer)
-        OpenWQindex_s = canopy_index_openwq
-        iz_s          = 1
-        wmass_source = canopyStorWat_kg_m3
-        ! *Recipient*: 
-        ! lost from system
-        OpenWQindex_r = -1
-        iz_r          = -1
-        ! *Flux*
-        ! transpiration + evaporation + sublimation
-        wflux_s2r =  scalarCanopyEvaporation_summa_m3  &
-                      + scalarCanopySublimation_summa_m3
-        
-        ! *Call openwq_run_space* if wflux_s2r not 0
-        err=openwq_obj%openwq_run_space(                                       &
-                                      simtime,                                 &
-                                      OpenWQindex_s, hru_index, iy_s, iz_s,    &
-                                      OpenWQindex_r, hru_index, iy_r, iz_r,    &
-                                      wflux_s2r,  &
-                                      wmass_source)
+        ! NOTE: Evaporation/transpiration/sublimation do NOT transport dissolved chemicals.
+        ! When water evaporates, the dissolved mass stays in the remaining water,
+        ! causing concentration enrichment. This happens AUTOMATICALLY in OpenWQ:
+        ! - SUMMA updates the water volume (canopyStorWat decreases)
+        ! - OpenWQ keeps track of chemical mass (unchanged by evaporation)
+        ! - Concentration = chemass / water_vol increases automatically
+        !
+        ! We do NOT call openwq_run_space here because recipient=-1 would
+        ! incorrectly REMOVE mass proportionally from the canopy.
+        ! The water loss is already handled by SUMMA's water balance.
 
       endif
 
@@ -633,28 +622,11 @@ subroutine openwq_run_space_step(summa1_struc)
       if (current_nSnow .gt. 0)then
 
         ! ====================================================
-        ! 2.2 snow -> OUT (lost from model) (sublimation)
+        ! 2.2 snow -> OUT (sublimation) - NO MASS TRANSPORT
         ! ====================================================
-        ! *Source*:
-        ! snow (upper layer)
-        OpenWQindex_s = snow_index_openwq
-        iz_s          = 1
-        mLayerVolFracWat_summa_m3 = mLayerVolFracWat_summa_frac(1) * hru_area_m2 * mLayerDepth_summa_m(1)
-        wmass_source              = mLayerVolFracWat_summa_m3
-        ! *Recipient*: 
-        ! lost from system
-        OpenWQindex_r = -1
-        iz_r          = -1
-        ! *Flux*
-        ! snow sublimation
-        wflux_s2r = scalarSnowSublimation_summa_m3
-        ! *Call openwq_run_space* if wflux_s2r not 0
-        err=openwq_obj%openwq_run_space(                       &
-          simtime,                                      &
-          OpenWQindex_s, hru_index, iy_s, iz_s,         &
-          OpenWQindex_r, hru_index, iy_r, iz_r,         &
-          wflux_s2r,                                    &
-          wmass_source)
+        ! NOTE: Snow sublimation does NOT transport dissolved chemicals.
+        ! Mass stays in remaining snow, concentration increases automatically.
+        ! See section 1.3 for detailed explanation.
 
         ! ====================================================
         ! 2.3 snow internal fluxes
@@ -802,27 +774,11 @@ subroutine openwq_run_space_step(summa1_struc)
 
       ! ====================================================
       ! 4.1 soil fluxes
-      ! upper soil -> OUT (lost from system) (ground evaporation)
+      ! upper soil -> OUT (ground evaporation) - NO MASS TRANSPORT
       ! ====================================================
-      ! *Source*: 
-      ! upper soil layer
-      OpenWQindex_s = soil_index_openwq
-      iz_s          = 1
-      mLayerVolFracWat_summa_m3 = mLayerVolFracWat_summa_frac(nSnow+1) * hru_area_m2 * mLayerDepth_summa_m(nSnow+1)
-      wmass_source              = mLayerVolFracWat_summa_m3
-      ! *Recipient*: 
-      ! lost from system
-      OpenWQindex_r  = -1
-      iz_r           = -1
-      ! *Flux*
-      wflux_s2r = scalarGroundEvaporation_summa_m3
-      ! *Call openwq_run_space* if wflux_s2r not 0
-      err=openwq_obj%openwq_run_space(                       &
-        simtime,                                      &
-        OpenWQindex_s, hru_index, iy_s, iz_s,         &
-        OpenWQindex_r, hru_index, iy_r, iz_r,         &
-        wflux_s2r,                                    &
-        wmass_source)
+      ! NOTE: Ground evaporation does NOT transport dissolved chemicals.
+      ! Mass stays in remaining soil water, concentration increases automatically.
+      ! See section 1.3 for detailed explanation.
 
       ! ====================================================
       ! 4.2 exfiltration
@@ -881,31 +837,11 @@ subroutine openwq_run_space_step(summa1_struc)
       end do
 
       ! ====================================================
-      ! 4.4 transpiration from the soil
-      ! Lost from the system
+      ! 4.4 transpiration from the soil - NO MASS TRANSPORT
       ! ====================================================
-      do iLayer = 1, nSoil
-        ! *Source*:  
-        ! all soil layers
-        OpenWQindex_s = soil_index_openwq
-        iz_s          = iLayer
-        mLayerVolFracWat_summa_m3 = mLayerVolFracWat_summa_frac(iLayer+nSnow) * hru_area_m2 * mLayerDepth_summa_m(iLayer+nSnow)
-        wmass_source              = mLayerVolFracWat_summa_m3
-        ! *Recipient*: 
-        ! lost from system
-        OpenWQindex_r = -1
-        iz_r          = -1
-        mLayerTranspire_summa_m3 = mLayerTranspire_summa_m_s(iLayer) * hru_area_m2 * data_step
-        ! *Flux*
-        wflux_s2r = mLayerTranspire_summa_m3
-        ! *Call openwq_run_space* if wflux_s2r not 0
-        err=openwq_obj%openwq_run_space(                       &
-          simtime,                                      &
-          OpenWQindex_s, hru_index, iy_s, iz_s,         &
-          OpenWQindex_r, hru_index, iy_r, iz_r,         &
-          wflux_s2r,                                    &
-          wmass_source)
-      end do
+      ! NOTE: Plant transpiration extracts water but leaves dissolved chemicals
+      ! in the soil. Mass stays in remaining soil water, concentration increases
+      ! automatically. See section 1.3 for detailed explanation.
       
       ! ====================================================
       ! 4.5 soil internal fluxes
@@ -987,26 +923,11 @@ subroutine openwq_run_space_step(summa1_struc)
         wmass_source)
 
       ! ====================================================
-      ! 5.2 Aquifer -> OUT (lost from model) (transpiration) 
+      ! 5.2 Aquifer -> OUT (transpiration) - NO MASS TRANSPORT
       ! ====================================================
-      ! *Source*: 
-      ! aquifer (only 1 z layer)
-      OpenWQindex_s = aquifer_index_openwq
-      iz_s          = 1
-      wmass_source = scalarAquiferStorage_summa_m3
-      ! *Recipient*: 
-      ! lost from system
-      OpenWQindex_r = -1
-      iz_r          = -1
-      ! *Flux*
-      wflux_s2r = scalarAquiferTranspire_summa_m3
-      ! *Call openwq_run_space* if wflux_s2r not 0
-      err=openwq_obj%openwq_run_space(                         &
-        simtime,                                        &
-        OpenWQindex_s, hru_index, iy_s, iz_s,           &
-        OpenWQindex_r, hru_index, iy_r, iz_r,           &
-        wflux_s2r,                                      & 
-        wmass_source)
+      ! NOTE: Aquifer transpiration extracts water but leaves dissolved chemicals
+      ! in the aquifer. Mass stays in remaining water, concentration increases
+      ! automatically. See section 1.3 for detailed explanation.
 
       end associate AquiferVars
       end associate Snow_SoilVars
