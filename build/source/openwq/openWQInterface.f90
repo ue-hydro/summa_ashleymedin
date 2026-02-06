@@ -46,9 +46,10 @@ interface
         nSnow_2openwq,                      &
         nSoil_2openwq,                      &
         simtime_summa,                      &
-        soilMoist_depVar_summa_frac,        &                
+        soilMoist_depVar_summa_frac,        &
         soilTemp_depVar_summa_K,            &
         airTemp_depVar_summa_K,             &
+        SWrad_depVar_summa_Wm2,             &
         sweWatVol_stateVar_summa_m3,        &
         canopyWatVol_stateVar_summa_m3,     &
         soilWatVol_stateVar_summa_m3,       &
@@ -66,6 +67,7 @@ interface
         real(c_double), intent(in)           :: soilMoist_depVar_summa_frac(nSoil_2openwq)
         real(c_double), intent(in)           :: soilTemp_depVar_summa_K(nSoil_2openwq)
         real(c_double), intent(in), value    :: airTemp_depVar_summa_K
+        real(c_double), intent(in), value    :: SWrad_depVar_summa_Wm2
         real(c_double), intent(in)           :: sweWatVol_stateVar_summa_m3(nSnow_2openwq)
         real(c_double), intent(in), value    :: canopyWatVol_stateVar_summa_m3
         real(c_double), intent(in)           :: soilWatVol_stateVar_summa_m3(nSoil_2openwq)

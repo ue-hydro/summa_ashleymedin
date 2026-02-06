@@ -118,13 +118,14 @@ class CLASSWQ_openwq
 
     int openwq_run_time_start(
         bool last_hru_flag,
-        int hru_index, 
-        int nSnow_2openwq, 
-        int nSoil_2openwq, 
+        int hru_index,
+        int nSnow_2openwq,
+        int nSoil_2openwq,
         int simtime_summa[],
-        double soilMoist_depVar_summa_frac[],                  
+        double soilMoist_depVar_summa_frac[],
         double soilTemp_depVar_summa_K[],
         double airTemp_depVar_summa_K,
+        double SWrad_depVar_summa_Wm2,
         double sweWatVol_stateVar_summa_m3[],
         double canopyWatVol_stateVar_summa_m3,
         double soilWatVol_stateVar_summa_m3[],

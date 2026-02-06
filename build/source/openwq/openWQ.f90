@@ -76,14 +76,15 @@ module openwq
       nSnow_2openwq,                         &
       nSoil_2openwq,                         &
       simtime,                               &
-      soilMoist_depVar_summa_frac,           &                    
+      soilMoist_depVar_summa_frac,           &
       soilTemp_depVar_summa_K,               &
       airTemp_depVar_summa_K,                &
+      SWrad_depVar_summa_Wm2,                &
       sweWatVol_stateVar_summa_m3,           &
       canopyWatVol_stateVar_summa_m3,        &
       soilWatVol_stateVar_summa_m3,          &
       aquiferWatVol_stateVar_summa_m3)
-      
+
       implicit none
       class(CLASSWQ_openwq)      :: this
       logical(1), intent(in)     :: last_hru_flag
@@ -92,6 +93,7 @@ module openwq
       integer(i4b), intent(in)   :: nSoil_2openwq
       integer(i4b), intent(in)   :: simtime(5) ! 5 is the number of timevars
       real(rkind),  intent(in)   :: airTemp_depVar_summa_K
+      real(rkind),  intent(in)   :: SWrad_depVar_summa_Wm2
       real(rkind),  intent(in)   :: soilTemp_depVar_summa_K(nSoil_2openwq)
       real(rkind),  intent(in)   :: soilMoist_depVar_summa_frac(nSoil_2openwq)
       real(rkind),  intent(in)   :: canopyWatVol_stateVar_summa_m3
@@ -100,20 +102,21 @@ module openwq
       real(rkind),  intent(in)   :: aquiferWatVol_stateVar_summa_m3
 
       openwq_run_time_start = openwq_run_time_start_c( &
-         this%ptr,                              & 
+         this%ptr,                              &
          last_hru_flag,                         &
          hru_index,                             &
          nSnow_2openwq,                         &
          nSoil_2openwq,                         &
          simtime,                               &
-         soilMoist_depVar_summa_frac,           &                    
+         soilMoist_depVar_summa_frac,           &
          soilTemp_depVar_summa_K,               &
          airTemp_depVar_summa_K,                &
+         SWrad_depVar_summa_Wm2,                &
          sweWatVol_stateVar_summa_m3,           &
          canopyWatVol_stateVar_summa_m3,        &
          soilWatVol_stateVar_summa_m3,          &
          aquiferWatVol_stateVar_summa_m3)
-   
+
    end function
 
    integer function openwq_run_space(  &

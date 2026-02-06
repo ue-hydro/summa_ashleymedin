@@ -132,9 +132,10 @@ subroutine openWQ_run_time_start_inner(openWQArrayIndex, iGRU, iHRU, &
   USE summa_type,only: summa1_type_dec            ! master summa data type
   USE var_lookup,only: iLookPROG  ! named variables for state variables
   USE var_lookup,only: iLookATTR  ! named variables for real valued attribute data structure
-  USE var_lookup,only: iLookINDEX 
+  USE var_lookup,only: iLookINDEX
   USE var_lookup,only: iLookVarType  ! named variables for real valued attribute data structure
   USE var_lookup,only: iLookTIME  ! named variables for time data structure
+  USE var_lookup,only: iLookFORCE ! named variables for forcing data structure
   USE globalData,only:prog_meta
   USE globalData,only:realMissing
   USE multiconst,only:iden_water        ! intrinsic density of liquid water    (kg m-3)
@@ -155,6 +156,7 @@ subroutine openWQ_run_time_start_inner(openWQArrayIndex, iGRU, iHRU, &
   real(rkind)                        :: soilWatVol_stateVar_summa_m3(nSoil)! OpenWQ State Var
   real(rkind)                        :: soilMoist_depVar_summa_frac(nSoil) ! OpenWQ State Var
   real(rkind)                        :: aquiferWatVol_stateVar_summa_m3    ! OpenWQ State Var
+  real(rkind)                        :: SWrad_summa_Wm2                    ! Shortwave radiation (W/m2)
   ! counter variables
   integer(i4b)                       :: ilay
   integer(i4b)                       :: iVar
@@ -169,6 +171,7 @@ subroutine openWQ_run_time_start_inner(openWQArrayIndex, iGRU, iHRU, &
     timeStruct                  => summa1_struc%timeStruct             , &
     hru_area_m2                 => summa1_struc%attrStruct%gru(iGRU)%hru(iHRU)%var(iLookATTR%HRUarea)                     ,&
     Tair_summa_K                => summa1_struc%progStruct%gru(iGRU)%hru(iHRU)%var(iLookPROG%scalarCanairTemp)%dat(1)     ,& ! air temperature (K)
+    SWRadAtm_summa_Wm2          => summa1_struc%forcStruct%gru(iGRU)%hru(iHRU)%var(iLookFORCE%SWRadAtm)                   ,& ! downward shortwave radiation (W/m2)
     scalarCanopyWat_summa_kg_m2 => summa1_struc%progStruct%gru(iGRU)%hru(iHRU)%var(iLookPROG%scalarCanopyWat)%dat(1)      ,& ! canopy water (kg m-2)
     mLayerDepth_summa_m         => summa1_struc%progStruct%gru(iGRU)%hru(iHRU)%var(iLookPROG%mLayerDepth)%dat(:)          ,& ! depth of each layer (m)
     mLayerVolFracWat_summa_frac => summa1_struc%progStruct%gru(iGRU)%hru(iHRU)%var(iLookPROG%mLayerVolFracWat)%dat(:)     ,& ! volumetric fraction of total water in each layer  (-)
@@ -183,7 +186,14 @@ subroutine openWQ_run_time_start_inner(openWQArrayIndex, iGRU, iHRU, &
   if(Tair_summa_K == realMissing) then
     stop 'Error: OpenWQ requires air temperature (K)'
   endif
-  
+
+  ! Shortwave radiation (W/m2)
+  if(SWRadAtm_summa_Wm2 == realMissing) then
+    SWrad_summa_Wm2 = 0._rkind
+  else
+    SWrad_summa_Wm2 = SWRadAtm_summa_Wm2
+  endif
+
   ! Vegetation
   ! unit for volume = m3 (summa-to-openwq unit conversions needed)
   ! scalarCanopyWat [kg m-2], so needs to  to multiply by hru area [m2] and divide by water density
@@ -267,14 +277,15 @@ subroutine openWQ_run_time_start_inner(openWQArrayIndex, iGRU, iHRU, &
   simtime(5) = timeStruct%var(iLookTIME%imin)  ! minute
         
   err=openwq_obj%openwq_run_time_start(&
-                                       last_hru_flag,                   & 
+                                       last_hru_flag,                   &
                                        openWQArrayIndex,                & ! total HRUs
                                        nSnow,                           &
                                        nSoil,                           &
                                        simtime,                         &
-                                       soilMoist_depVar_summa_frac,     &                    
+                                       soilMoist_depVar_summa_frac,     &
                                        soilTemp_depVar_summa_K,         &
                                        Tair_summa_K,                    & ! air temperature (K)
+                                       SWrad_summa_Wm2,                 & ! shortwave radiation (W/m2)
                                        sweWatVol_stateVar_summa_m3,     &
                                        canopyWatVol_stateVar_summa_m3,  &
                                        soilWatVol_stateVar_summa_m3,    &

@@ -58,9 +58,11 @@ int CLASSWQ_openwq::decl(
 
         // Dependencies
         // to expand BGC modelling options
+        // These variables can be used in BGC kinetic expressions (e.g., temperature-dependent rates)
         OpenWQ_hostModelconfig_ref->add_HydroDepend(0,"SM",        num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
         OpenWQ_hostModelconfig_ref->add_HydroDepend(1,"Tair_K",    num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
         OpenWQ_hostModelconfig_ref->add_HydroDepend(2,"Tsoil_K",   num_HRU,nYdirec_2openwq, nSnow_2openwq + nSoil_2openwq);
+        OpenWQ_hostModelconfig_ref->add_HydroDepend(3,"SWrad_Wm2", num_HRU,nYdirec_2openwq, 1);  // Incoming shortwave radiation [W/m2]
         
         // Mapping summa element ids (HRUs) to OpenWQ elements
         // in summa it's named hruId
@@ -122,13 +124,14 @@ int CLASSWQ_openwq::decl(
 // soilMoist_depVar does not have a value - it is passed as 0
 int CLASSWQ_openwq::openwq_run_time_start(
     bool last_hru_flag,
-    int index_hru, 
-    int nSnow_2openwq, 
+    int index_hru,
+    int nSnow_2openwq,
     int nSoil_2openwq,
     int simtime_summa[],
-    double soilMoist_depVar_summa_frac[],                  
+    double soilMoist_depVar_summa_frac[],
     double soilTemp_depVar_summa_K[],
     double airTemp_depVar_summa_K,
+    double SWrad_depVar_summa_Wm2,
     double sweWatVol_stateVar_summa_m3[],
     double canopyWatVol_stateVar_summa_m3,
     double soilWatVol_stateVar_summa_m3[],
@@ -136,18 +139,19 @@ int CLASSWQ_openwq::openwq_run_time_start(
 
     time_t simtime = OpenWQ_units_ref->convertTime_ints2time_t(
         *OpenWQ_wqconfig_ref,
-        simtime_summa[0], 
-        simtime_summa[1], 
-        simtime_summa[2], 
-        simtime_summa[3], 
+        simtime_summa[0],
+        simtime_summa[1],
+        simtime_summa[2],
+        simtime_summa[3],
         simtime_summa[4],
         0);
-    
+
     int runoff_vol = 0;
-    
+
     // Updating Chemistry dependencies and volumes (out of order because of looping)
 
-    OpenWQ_hostModelconfig_ref->set_dependVar_at(1,index_hru,0,0, airTemp_depVar_summa_K);
+    OpenWQ_hostModelconfig_ref->set_dependVar_at(1,index_hru,0,0, airTemp_depVar_summa_K);   // Tair_K [K]
+    OpenWQ_hostModelconfig_ref->set_dependVar_at(3,index_hru,0,0, SWrad_depVar_summa_Wm2);   // SWrad_Wm2 [W/m2]
     OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(canopy_index_openwq,index_hru,0,0, canopyWatVol_stateVar_summa_m3);   // canopy
     OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(runoff_index_openwq,index_hru,0,0, runoff_vol);                       // runoff
     OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(aquifer_index_openwq,index_hru,0,0, aquiferWatVol_stateVar_summa_m3); // aquifer
@@ -156,10 +160,10 @@ int CLASSWQ_openwq::openwq_run_time_start(
     for (int z = 0; z < nSnow_2openwq; z++) {
         OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(snow_index_openwq,index_hru,0,z, sweWatVol_stateVar_summa_m3[z]);  // snow
     }
-    
+
     // Update Vars that rely on Soil
     for (int z = 0; z < nSoil_2openwq; z++) {
-        OpenWQ_hostModelconfig_ref->set_dependVar_at(0,index_hru,0,z,soilMoist_depVar_summa_frac[z]); 
+        OpenWQ_hostModelconfig_ref->set_dependVar_at(0,index_hru,0,z,soilMoist_depVar_summa_frac[z]);
         OpenWQ_hostModelconfig_ref->set_dependVar_at(2,index_hru,0,z,soilTemp_depVar_summa_K[z]);
         OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(soil_index_openwq,index_hru,0,z, soilWatVol_stateVar_summa_m3[z]);      // soil
 
