@@ -177,6 +177,19 @@ int CLASSWQ_openwq::decl(
             *OpenWQ_TS_model_ref,
             *OpenWQ_extwatflux_ss_ref,
             *OpenWQ_output_ref);
+
+        // Parse Sink/Source and External Water Flux data
+        // Must be called AFTER InitialConfig (memory allocated)
+        // and AFTER cell_id registration (so cell_id lookups succeed)
+        OpenWQ_couplercalls_ref->ParseEWFandSS(
+            *OpenWQ_json_ref,
+            *OpenWQ_vars_ref,
+            *OpenWQ_hostModelconfig_ref,
+            *OpenWQ_wqconfig_ref,
+            *OpenWQ_units_ref,
+            *OpenWQ_utils_ref,
+            *OpenWQ_output_ref,
+            *OpenWQ_extwatflux_ss_ref);
     }
 
     return 0;
