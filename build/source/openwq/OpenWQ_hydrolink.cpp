@@ -142,7 +142,7 @@ int CLASSWQ_openwq::decl(
             nAquifer_2openwq
         };
 
-        for (int cmp = 0; cmp < OpenWQ_hostModelconfig_ref->get_num_HydroComp(); cmp++) {
+        for (int cmp = 0; cmp < (int)OpenWQ_hostModelconfig_ref->get_num_HydroComp(); cmp++) {
             // Allocate the 3D structure for this compartment
             arma::Cube<double> domain_xyz(num_HRU, nYdirec_2openwq, zdimension_cmp[cmp]);
             OpenWQ_hostModelconfig_ref->set_cellid_to_wq_size(domain_xyz);
