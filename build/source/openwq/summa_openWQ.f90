@@ -458,7 +458,6 @@ subroutine openwq_run_space_step(summa1_struc)
    real(rkind)  :: scalarExfiltration_summa_m3
    real(rkind)  :: mLayerBaseflow_summa_m3
    real(rkind)  :: scalarSoilDrainage_summa_m3
-   real(rkind)  :: mLayerTranspire_summa_m3
    real(rkind)  :: scalarAquiferBaseflow_summa_m3
    real(rkind)  :: scalarAquiferRecharge_summa_m3
    real(rkind)  :: scalarAquiferStorage_summa_m3
