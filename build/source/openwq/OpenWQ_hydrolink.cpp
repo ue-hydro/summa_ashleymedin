@@ -104,6 +104,25 @@ int CLASSWQ_openwq::decl(
         OpenWQ_hostModelconfig_ref->add_HydroExtFlux(
             0, "PRECIP", num_HRU, nYdirec_2openwq, 1);
 
+        // ---------------------------------------------------------------------
+        // Flux-concentration exports (openWQ prints these when the master-file
+        // OUTPUT block selects them via FLUXES_CONC_TO_PRINT). The coupler fills
+        // the flux through-volume at runtime.
+        // Each export is named EXACTLY after the SUMMA variable it reports.
+        // src = RUNOFF compartment for all of them, so the exported concentration
+        // is the soil-buffered runoff conc that mizuRoute ingests via EWF; they
+        // differ only in the flux through-volume (used for mass output).
+        // ---------------------------------------------------------------------
+        OpenWQ_hostModelconfig_ref->add_FluxConcExport(
+            scalarRunoffVol_fluxexp_openwq, "scalarRunoffVol_m3",
+            runoff_index_openwq, num_HRU, nYdirec_2openwq, nRunoff_2openwq);
+        OpenWQ_hostModelconfig_ref->add_FluxConcExport(
+            averageRoutedRunoff_fluxexp_openwq, "averageRoutedRunoff",
+            runoff_index_openwq, num_HRU, nYdirec_2openwq, nRunoff_2openwq);
+        OpenWQ_hostModelconfig_ref->add_FluxConcExport(
+            scalarTotalRunoff_fluxexp_openwq, "scalarTotalRunoff",
+            runoff_index_openwq, num_HRU, nYdirec_2openwq, nRunoff_2openwq);
+
         // Initialize state variables container
         OpenWQ_vars_ref = std::make_unique<OpenWQ_vars>(
             OpenWQ_hostModelconfig_ref->get_num_HydroComp(),
@@ -124,6 +143,12 @@ int CLASSWQ_openwq::decl(
 
         OpenWQ_hostModelconfig_ref->add_HydroDepend(
             3, "SWrad_Wm2", num_HRU, nYdirec_2openwq, 1);
+
+        // Cell (HRU) area [m2] — used by the HBVSED sediment module to convert
+        // water volumes (m3) to precipitation depth (mm) and areal sediment
+        // densities (g/m2) to absolute mass (kg).
+        OpenWQ_hostModelconfig_ref->add_HydroDepend(
+            4, "cellArea_m2", num_HRU, nYdirec_2openwq, 1);
 
         // ---------------------------------------------------------------------
         // Map SUMMA element IDs (HRUs) to OpenWQ elements
@@ -232,7 +257,8 @@ int CLASSWQ_openwq::openwq_run_time_start(
     double sweWatVol_stateVar_summa_m3[],
     double canopyWatVol_stateVar_summa_m3,
     double soilWatVol_stateVar_summa_m3[],
-    double aquiferWatVol_stateVar_summa_m3) {
+    double aquiferWatVol_stateVar_summa_m3,
+    double hru_area_m2) {
 
     time_t simtime = OpenWQ_units_ref->convertTime_ints2time_t(
         *OpenWQ_wqconfig_ref,
@@ -254,6 +280,9 @@ int CLASSWQ_openwq::openwq_run_time_start(
     OpenWQ_hostModelconfig_ref->set_dependVar_at(
         3, index_hru, 0, 0, SWrad_depVar_summa_Wm2);
 
+    OpenWQ_hostModelconfig_ref->set_dependVar_at(
+        4, index_hru, 0, 0, hru_area_m2);
+
     // -------------------------------------------------------------------------
     // Update water volumes (unlayered compartments)
     // -------------------------------------------------------------------------
@@ -267,11 +296,18 @@ int CLASSWQ_openwq::openwq_run_time_start(
         aquifer_index_openwq, index_hru, 0, 0, aquiferWatVol_stateVar_summa_m3);
 
     // -------------------------------------------------------------------------
-    // Update snow layer volumes
+    // Update snow layer volumes. Layers beyond the CURRENT snowpack are zeroed
+    // explicitly: when the snowpack melts (nSnow -> 0) the stored volumes would
+    // otherwise keep their last nonzero values forever - which, among other
+    // things, permanently trips HBVSED's snow erosion-inhibit gate.
     // -------------------------------------------------------------------------
-    for (int z = 0; z < nSnow_2openwq; z++) {
-        OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(
-            snow_index_openwq, index_hru, 0, z, sweWatVol_stateVar_summa_m3[z]);
+    {
+        const int nz_snow = (int) OpenWQ_hostModelconfig_ref->get_HydroComp_num_cells_z_at(snow_index_openwq);
+        for (int z = 0; z < nz_snow; z++) {
+            const double swe_vol = (z < nSnow_2openwq) ? sweWatVol_stateVar_summa_m3[z] : 0.0;
+            OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(
+                snow_index_openwq, index_hru, 0, z, swe_vol);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -435,6 +471,43 @@ int CLASSWQ_openwq::openwq_run_space_in(
         source_EWF_name,
         recipient, ix_r, iy_r, iz_r,
         wflux_s2r);
+
+    return 0;
+}
+
+// =============================================================================
+// openwq_update_runoff_vol: report the runoff through-volume of this step
+// =============================================================================
+// SUMMA's RUNOFF compartment is a transient routing pool: its volume is reset
+// to zero at run_time_start. The coupling reports here the runoff volume
+// accumulated during the space-step so that model_SI (sorption), the output
+// concentration conversion, and other volume-dependent processes see the
+// water that was actually routed through the compartment.
+int CLASSWQ_openwq::openwq_update_runoff_vol(
+    int index_hru,
+    double runoff_vol_m3) {
+
+    // Convert Fortran 1-based index to C++ 0-based
+    index_hru -= 1;
+
+    OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(
+        runoff_index_openwq, index_hru, 0, 0, runoff_vol_m3);
+
+    return 0;
+}
+
+// =============================================================================
+// openwq_set_fluxvol: fill the through-volume of a flux-concentration export
+// =============================================================================
+// Called by the coupler where the flux is computed. iflux is the 0-based export
+// index (as registered via add_FluxConcExport); ix,iy,iz are Fortran 1-based
+// cell indices. The output writer forms conc = chemass[src]/waterVol[src] and
+// mass = conc * fluxVol, so the coupler simply reports the flux water volume.
+int CLASSWQ_openwq::openwq_set_fluxvol(
+    int iflux, int ix, int iy, int iz, double flux_vol_m3) {
+
+    OpenWQ_hostModelconfig_ref->set_fluxVol_hydromodel_at(
+        iflux, ix - 1, iy - 1, iz - 1, flux_vol_m3);
 
     return 0;
 }

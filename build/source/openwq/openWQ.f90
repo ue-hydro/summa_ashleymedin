@@ -53,6 +53,8 @@ module openwq
       procedure :: openwq_run_time_start => openwq_run_time_start
       procedure :: openwq_run_space => openwq_run_space
       procedure :: openwq_run_space_in => openwq_run_space_in
+      procedure :: openwq_update_runoff_vol => openwq_update_runoff_vol
+      procedure :: openwq_set_fluxvol => openwq_set_fluxvol
       procedure :: openwq_run_time_end => openwq_run_time_end
 
    end type
@@ -140,7 +142,8 @@ contains
       sweWatVol_stateVar_summa_m3,           &
       canopyWatVol_stateVar_summa_m3,        &
       soilWatVol_stateVar_summa_m3,          &
-      aquiferWatVol_stateVar_summa_m3)
+      aquiferWatVol_stateVar_summa_m3,       &
+      hru_area_m2)
 
       implicit none
       class(CLASSWQ_openwq)      :: this
@@ -157,6 +160,7 @@ contains
       real(rkind),  intent(in)   :: sweWatVol_stateVar_summa_m3(nSnow_2openwq)
       real(rkind),  intent(in)   :: soilWatVol_stateVar_summa_m3(nSoil_2openwq)
       real(rkind),  intent(in)   :: aquiferWatVol_stateVar_summa_m3
+      real(rkind),  intent(in)   :: hru_area_m2
 
       openwq_run_time_start = openwq_run_time_start_c( &
          this%ptr,                              &
@@ -172,7 +176,8 @@ contains
          sweWatVol_stateVar_summa_m3,           &
          canopyWatVol_stateVar_summa_m3,        &
          soilWatVol_stateVar_summa_m3,          &
-         aquiferWatVol_stateVar_summa_m3)
+         aquiferWatVol_stateVar_summa_m3,       &
+         hru_area_m2)
 
    end function
 
@@ -245,6 +250,49 @@ contains
          source_EWF_name,                          &
          recipient, ix_r, iy_r, iz_r,              &
          wflux_s2r)
+
+   end function
+
+   ! ===========================================================================
+   ! openwq_update_runoff_vol: report the runoff through-volume of this step
+   ! ===========================================================================
+   ! SUMMA's RUNOFF compartment is a transient routing pool whose start-of-step
+   ! volume is zero. Reporting the routed volume enables sorption (model_SI)
+   ! and concentration outputs in the RUNOFF compartment.
+   !
+   ! Returns: 0 on success
+   ! ===========================================================================
+   integer function openwq_update_runoff_vol( &
+      this,                                   &
+      index_hru,                              &
+      runoff_vol_m3)
+
+      implicit none
+      class(CLASSWQ_openwq)      :: this
+      integer(i4b), intent(in)   :: index_hru
+      real(rkind),  intent(in)   :: runoff_vol_m3
+
+      openwq_update_runoff_vol = openwq_update_runoff_vol_c( &
+         this%ptr, index_hru, runoff_vol_m3)
+
+   end function
+
+   ! ===========================================================================
+   ! openwq_set_fluxvol: fill the through-volume of a flux-concentration export
+   ! ===========================================================================
+   integer function openwq_set_fluxvol( &
+      this, iflux, ix, iy, iz, flux_vol_m3)
+
+      implicit none
+      class(CLASSWQ_openwq)      :: this
+      integer(i4b), intent(in)   :: iflux        ! 0-based flux-export index
+      integer(i4b), intent(in)   :: ix           ! 1-based cell indices
+      integer(i4b), intent(in)   :: iy
+      integer(i4b), intent(in)   :: iz
+      real(rkind),  intent(in)   :: flux_vol_m3  ! flux through-volume [m3]
+
+      openwq_set_fluxvol = openwq_set_fluxvol_c( &
+         this%ptr, iflux, ix, iy, iz, flux_vol_m3)
 
    end function
 

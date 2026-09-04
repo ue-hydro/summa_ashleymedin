@@ -88,7 +88,8 @@ interface
         sweWatVol_stateVar_summa_m3,        &
         canopyWatVol_stateVar_summa_m3,     &
         soilWatVol_stateVar_summa_m3,       &
-        aquiferWatVol_stateVar_summa_m3) bind(C, name="openwq_run_time_start")
+        aquiferWatVol_stateVar_summa_m3,    &
+        hru_area_m2) bind(C, name="openwq_run_time_start")
 
         use iso_c_binding
         implicit none
@@ -107,6 +108,7 @@ interface
         real(c_double), intent(in), value    :: canopyWatVol_stateVar_summa_m3
         real(c_double), intent(in)           :: soilWatVol_stateVar_summa_m3(nSoil_2openwq)
         real(c_double), intent(in), value    :: aquiferWatVol_stateVar_summa_m3
+        real(c_double), intent(in), value    :: hru_area_m2
 
     end function
 
@@ -166,6 +168,45 @@ interface
         integer(c_int), intent(in), value      :: iz_r
         real(c_double), intent(in), value      :: wflux_s2r
         character(c_char), intent(in)          :: source_EWF_name
+
+    end function
+
+    ! ==========================================================================
+    ! openwq_update_runoff_vol_c: report runoff through-volume of this step
+    ! ==========================================================================
+    ! SUMMA's RUNOFF is a transient pool (start-of-step volume is zero);
+    ! this reports the routed volume so sorption and concentration output work.
+    ! Returns: 0 (success)
+    ! ==========================================================================
+    function openwq_update_runoff_vol_c(&
+        openWQ, &
+        index_hru, &
+        runoff_vol_m3) bind(C, name="openwq_update_runoff_vol")
+
+        use iso_c_binding
+        implicit none
+        integer(c_int) :: openwq_update_runoff_vol_c
+        type(c_ptr),    intent(in), value      :: openWQ
+        integer(c_int), intent(in), value      :: index_hru
+        real(c_double), intent(in), value      :: runoff_vol_m3
+
+    end function
+
+    ! ==========================================================================
+    ! openwq_set_fluxvol_c: fill through-volume of a flux-concentration export
+    ! ==========================================================================
+    function openwq_set_fluxvol_c( &
+        openWQ, iflux, ix, iy, iz, flux_vol_m3) bind(C, name="openwq_set_fluxvol")
+
+        use iso_c_binding
+        implicit none
+        integer(c_int) :: openwq_set_fluxvol_c
+        type(c_ptr),    intent(in), value      :: openWQ
+        integer(c_int), intent(in), value      :: iflux
+        integer(c_int), intent(in), value      :: ix
+        integer(c_int), intent(in), value      :: iy
+        integer(c_int), intent(in), value      :: iz
+        real(c_double), intent(in), value      :: flux_vol_m3
 
     end function
 

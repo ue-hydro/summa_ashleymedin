@@ -85,7 +85,8 @@ extern "C" {
         double sweWatVol_stateVar[],
         double canopyWat,
         double soilWatVol_stateVar[],
-        double aquiferStorage);
+        double aquiferStorage,
+        double hru_area_m2);
 
     // Called at the end of each timestep to solve and write outputs
     int openwq_run_time_end(
@@ -111,6 +112,17 @@ extern "C" {
         char* source_EWF_name,
         int recipient, int ix_r, int iy_r, int iz_r,
         double wflux_s2r);
+
+    // Report the runoff through-volume of this step (see hydrolink)
+    int openwq_update_runoff_vol(
+        CLASSWQ_openwq *openWQ,
+        int index_hru,
+        double runoff_vol_m3);
+
+    int openwq_set_fluxvol(
+        CLASSWQ_openwq *openWQ,
+        int iflux, int ix, int iy, int iz,
+        double flux_vol_m3);
 
 #ifdef __cplusplus
 }

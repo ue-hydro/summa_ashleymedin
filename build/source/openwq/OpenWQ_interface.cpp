@@ -85,7 +85,8 @@ int openwq_run_time_start(
     double sweWatVol_stateVar_summa_m3[],
     double canopyWatVol_stateVar_summa_m3,
     double soilWatVol_stateVar_summa_m3[],
-    double aquiferWatVol_stateVar_summa_m3) {
+    double aquiferWatVol_stateVar_summa_m3,
+    double hru_area_m2) {
 
     return openWQ->openwq_run_time_start(
         last_hru_flag,
@@ -100,7 +101,8 @@ int openwq_run_time_start(
         sweWatVol_stateVar_summa_m3,
         canopyWatVol_stateVar_summa_m3,
         soilWatVol_stateVar_summa_m3,
-        aquiferWatVol_stateVar_summa_m3);
+        aquiferWatVol_stateVar_summa_m3,
+        hru_area_m2);
 }
 
 int openwq_run_time_end(
@@ -143,4 +145,20 @@ int openwq_run_space_in(
         source_EWF_name_str,
         recipient, ix_r, iy_r, iz_r,
         wflux_s2r);
+}
+
+int openwq_update_runoff_vol(
+    CLASSWQ_openwq *openWQ,
+    int index_hru,
+    double runoff_vol_m3) {
+
+    return openWQ->openwq_update_runoff_vol(index_hru, runoff_vol_m3);
+}
+
+int openwq_set_fluxvol(
+    CLASSWQ_openwq *openWQ,
+    int iflux, int ix, int iy, int iz,
+    double flux_vol_m3) {
+
+    return openWQ->openwq_set_fluxvol(iflux, ix, iy, iz, flux_vol_m3);
 }

@@ -99,6 +99,7 @@ subroutine openwq_init(err)
    ! Local variables
    integer(i4b) :: hruCount
    integer(i4b) :: hru_i
+   integer(i4b) :: iGRU_l, iHRU_l
    integer(i8b), dimension(:), allocatable :: hruId
    integer(i4b) :: nSoil
    character(len=256) :: message
@@ -116,10 +117,20 @@ subroutine openwq_init(err)
    hruCount = sum(gru_struc(:)%hruCount)
    nSoil = maxLayers - maxSnowLayers
 
-   ! Build HRU ID array for OpenWQ
+   ! Build HRU ID array for OpenWQ.
+   ! One OpenWQ cell exists per HRU (in GRU-major, HRU-minor order — the same
+   ! order the run loops use).  We must therefore assign the actual per-HRU id
+   ! (gru_struc(iGRU)%hruInfo(iHRU)%hru_id), NOT the gru_id.  The previous code
+   ! looped over GRUs and stored gru_id, which is only correct for the special
+   ! case of one HRU per GRU; with multiple HRUs per GRU it left cells 2..n of
+   ! each GRU uninitialised (garbage/duplicate ids in the HDF5 output).
    allocate(hruId(hruCount))
-   do hru_i = 1, size(gru_struc)
-      hruId(hru_i) = gru_struc(hru_i)%gru_id
+   hru_i = 0
+   do iGRU_l = 1, size(gru_struc)
+      do iHRU_l = 1, gru_struc(iGRU_l)%hruCount
+         hru_i = hru_i + 1
+         hruId(hru_i) = gru_struc(iGRU_l)%hruInfo(iHRU_l)%hru_id
+      end do
    end do
 
    ! Initialize OpenWQ with SUMMA domain configuration
@@ -371,7 +382,8 @@ subroutine openWQ_run_time_start_inner(openWQArrayIndex, iGRU, iHRU, &
       sweWatVol_stateVar_summa_m3, &
       canopyWatVol_stateVar_summa_m3, &
       soilWatVol_stateVar_summa_m3, &
-      aquiferWatVol_stateVar_summa_m3)
+      aquiferWatVol_stateVar_summa_m3, &
+      hru_area_m2)
 
    end associate summaVars
 
@@ -400,6 +412,7 @@ subroutine openwq_run_space_step(summa1_struc)
    USE var_lookup, only: iLookPROG
    USE var_lookup, only: iLookTIME
    USE var_lookup, only: iLookFLUX
+   USE var_lookup, only: iLookBVAR   ! for averageRoutedRunoff flux-conc export
    USE var_lookup, only: iLookATTR
    USE var_lookup, only: iLookINDEX
    USE var_lookup, only: iLookTYPE
@@ -447,6 +460,8 @@ subroutine openwq_run_space_step(summa1_struc)
    real(rkind)  :: scalarCanopyEvaporation_summa_m3
    real(rkind)  :: scalarCanopySublimation_summa_m3
    real(rkind)  :: scalarRunoffVol_m3
+   real(rkind)  :: averageRoutedRunoff_summa_m3   ! SUMMA routed runoff volume [m3/step] (flux-conc export)
+   real(rkind)  :: scalarTotalRunoff_summa_m3     ! SUMMA total runoff volume  [m3/step] (flux-conc export)
    real(rkind)  :: scalarSurfaceRunoff_summa_m3
    real(rkind)  :: scalarInfiltration_summa_m3
    real(rkind)  :: mLayerLiqFluxSnow_summa_m3
@@ -700,6 +715,18 @@ subroutine openwq_run_space_step(summa1_struc)
          ! 3. RUNOFF FLUXES
          ! ====================================================================
 
+         ! 3.0 Report the runoff through-volume for this step. RUNOFF is a
+         ! transient pool (start-of-step volume is zero): sorption (model_SI)
+         ! and concentration outputs need the volume of water actually routed.
+         ! Numerical dribbles (< 0.001 mm over the HRU) are reported as ZERO so
+         ! those steps are masked as no-water instead of producing absurd
+         ! concentrations (finite mass / vanishing volume).
+         if (scalarRunoffVol_m3 >= 1.0e-6_rkind * hru_area_m2) then
+            err = openwq_obj%openwq_update_runoff_vol(hru_index, scalarRunoffVol_m3)
+         else
+            err = openwq_obj%openwq_update_runoff_vol(hru_index, 0._rkind)
+         end if
+
          ! 3.1 Runoff -> Soil (infiltration)
          wflux_s2r = scalarInfiltration_summa_m3
          OpenWQindex_s = runoff_index_openwq
@@ -726,6 +753,28 @@ subroutine openwq_run_space_step(summa1_struc)
             OpenWQindex_s, hru_index, iy_s, iz_s, &
             OpenWQindex_r, hru_index, iy_r, iz_r, &
             wflux_s2r, wmass_source)
+
+         ! Report the runoff-to-stream through-volume for the RUNOFF_TO_STREAM
+         ! flux-conc export (index 0). openWQ prints conc = runoff_mass /
+         ! waterVol[RUNOFF] (the soil-buffered runoff concentration mizuRoute
+         ! ingests via EWF); mass (if requested) = conc * this stream volume.
+         ! Selected via FLUXES_CONC_TO_PRINT in the master file OUTPUT block.
+         ! Convert the SUMMA runoff-rate variables (m/s) to a per-step volume
+         ! (m/s * area * dt). averageRoutedRunoff is a basin (GRU) variable.
+         averageRoutedRunoff_summa_m3 = &
+            summa1_struc%bvarStruct%gru(iGRU)%var(iLookBVAR%averageRoutedRunoff)%dat(1) &
+            * hru_area_m2 * data_step
+         scalarTotalRunoff_summa_m3 = &
+            fluxStruct%gru(iGRU)%hru(iHRU)%var(iLookFLUX%scalarTotalRunoff)%dat(1) &
+            * hru_area_m2 * data_step
+         ! Three flux-conc exports, each named after its SUMMA host variable
+         ! (index 0/1/2 = scalarRunoffVol_m3 / averageRoutedRunoff / scalarTotalRunoff).
+         err = openwq_obj%openwq_set_fluxvol( &
+            0, hru_index, 1, 1, wflux_s2r)
+         err = openwq_obj%openwq_set_fluxvol( &
+            1, hru_index, 1, 1, averageRoutedRunoff_summa_m3)
+         err = openwq_obj%openwq_set_fluxvol( &
+            2, hru_index, 1, 1, scalarTotalRunoff_summa_m3)
 
          ! ====================================================================
          ! 4. SOIL FLUXES

@@ -82,6 +82,16 @@ inline int soil_index_openwq   = 3;  // Soil layers
 inline int aquifer_index_openwq = 4;  // Aquifer/groundwater storage
 inline int max_snow_layers     = 5;  // Maximum number of snow layers
 
+// Global Indexes for Flux-Concentration Exports
+// Flux-concentration exports, named EXACTLY after the SUMMA host-model
+// variable each one reports (the flux through-volume). All three draw the
+// concentration from the RUNOFF compartment (so the exported conc is identical);
+// they differ in the flux volume used for mass. Select which to write via
+// FLUXES_CONC_TO_PRINT in the master file.
+inline int scalarRunoffVol_fluxexp_openwq     = 0;  // accumulated runoff volume leaving to stream [m3]
+inline int averageRoutedRunoff_fluxexp_openwq = 1;  // SUMMA routed runoff (bvar, m/s -> m3/step)
+inline int scalarTotalRunoff_fluxexp_openwq   = 2;  // SUMMA total runoff (flux, m/s -> m3/step)
+
 
 // =============================================================================
 // CLASSWQ_openwq Class Definition
@@ -208,7 +218,8 @@ public:
         double sweWatVol_stateVar_summa_m3[],
         double canopyWatVol_stateVar_summa_m3,
         double soilWatVol_stateVar_summa_m3[],
-        double aquiferWatVol_stateVar_summa_m3);
+        double aquiferWatVol_stateVar_summa_m3,
+        double hru_area_m2);
 
     // -------------------------------------------------------------------------
     // openwq_run_space: Handle internal water/mass fluxes
@@ -252,6 +263,29 @@ public:
         std::string source_EWF_name,
         int recipient, int ix_r, int iy_r, int iz_r,
         double wflux_s2r);
+
+    // -------------------------------------------------------------------------
+    // openwq_update_runoff_vol: report the runoff through-volume of this step
+    // -------------------------------------------------------------------------
+    // SUMMA's RUNOFF is a transient routing pool whose start-of-step volume is
+    // zero (see openwq_run_time_start). Sorption (model_SI), concentration
+    // outputs, and any volume-dependent process in the RUNOFF compartment need
+    // the volume of water actually routed through it this step. Called from
+    // the space-step once the runoff inflows are accumulated.
+    //
+    // Parameters:
+    //   index_hru     - HRU index (1-indexed from Fortran)
+    //   runoff_vol_m3 - Runoff water volume generated this step [m3]
+    //
+    // Returns: 0 on success
+    // -------------------------------------------------------------------------
+    int openwq_update_runoff_vol(
+        int index_hru,
+        double runoff_vol_m3);
+
+    // Fill the through-volume of a flux-concentration export (coupler-called)
+    int openwq_set_fluxvol(
+        int iflux, int ix, int iy, int iz, double flux_vol_m3);
 
     // -------------------------------------------------------------------------
     // openwq_run_time_end: End timestep processing
