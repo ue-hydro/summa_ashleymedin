@@ -80,15 +80,34 @@ inline int snow_index_openwq   = 1;  // Snow layers (up to max_snow_layers)
 inline int runoff_index_openwq = 2;  // Surface runoff pool
 inline int soil_index_openwq   = 3;  // Soil layers
 inline int aquifer_index_openwq = 4;  // Aquifer/groundwater storage
+inline int stream_index_openwq = 5;   // Water delivered to the stream (transient pool, see below)
 inline int max_snow_layers     = 5;  // Maximum number of snow layers
+
+// RUNOFF_TO_STREAM pool
+// SUMMA delivers water to the stream through four fluxes that leave the
+// domain (recipient = -1): the surface runoff that does not infiltrate, the
+// exfiltration, the baseflow of every soil layer and the aquifer baseflow.
+// The solute they carry is copied into this transient pool, whose volume is
+// SUMMA's total runoff of the step, so that its concentration is the
+// flux-weighted concentration of everything the land hands to the stream
+// and concentration x total runoff returns the mass delivered.
+// The pool is emptied every step. It holds no reactions and it does not alter
+// the mass leaving any other compartment.
 
 // Global Indexes for Flux-Concentration Exports
 // Flux-concentration exports, named EXACTLY after the SUMMA host-model
-// variable each one reports (the flux through-volume). All three draw the
-// concentration from the RUNOFF compartment (so the exported conc is identical);
-// they differ in the flux volume used for mass. Select which to write via
-// FLUXES_CONC_TO_PRINT in the master file.
-inline int scalarRunoffVol_fluxexp_openwq     = 0;  // accumulated runoff volume leaving to stream [m3]
+// variable each one reports (the flux through-volume). Select which to write
+// via FLUXES_CONC_TO_PRINT in the master file.
+//   scalarRunoffVol_m3  : concentration of the RUNOFF compartment, that is,
+//                         of the SURFACE runoff only.
+//   averageRoutedRunoff,
+//   scalarTotalRunoff   : concentration of the RUNOFF_TO_STREAM pool, that is,
+//                         of ALL the water delivered to the stream (surface
+//                         runoff + exfiltration + soil baseflow + aquifer
+//                         baseflow). These are the ones a river-routing model
+//                         should ingest. They differ only in the flux volume
+//                         used when mass is requested.
+inline int scalarRunoffVol_fluxexp_openwq     = 0;  // surface runoff volume leaving to stream [m3]
 inline int averageRoutedRunoff_fluxexp_openwq = 1;  // SUMMA routed runoff (bvar, m/s -> m3/step)
 inline int scalarTotalRunoff_fluxexp_openwq   = 2;  // SUMMA total runoff (flux, m/s -> m3/step)
 
@@ -149,6 +168,11 @@ private:
     int num_HRU;              // Number of HRUs
     const float* hru_area;    // HRU areas
     long long* hruId;         // Array of HRU IDs
+
+    // RUNOFF_TO_STREAM pool (per HRU): water delivered to the stream in the
+    // current step [m3] and HRU area [m2] (to mask numerical dribbles)
+    std::vector<double> stream_vol_m3;
+    std::vector<double> stream_hru_area_m2;
 
 public:
     // Constructor and destructor

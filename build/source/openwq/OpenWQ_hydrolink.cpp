@@ -97,6 +97,16 @@ int CLASSWQ_openwq::decl(
             aquifer_index_openwq, "SCALARAQUIFER",
             num_HRU, nYdirec_2openwq, nAquifer_2openwq);
 
+        // Transient pool with the water (and solute) delivered to the stream
+        // in each step: surface runoff + exfiltration + soil baseflow +
+        // aquifer baseflow. Filled in openwq_run_space, emptied in
+        // openwq_run_time_end. One cell per HRU.
+        OpenWQ_hostModelconfig_ref->add_HydroComp(
+            stream_index_openwq, "RUNOFF_TO_STREAM",
+            num_HRU, nYdirec_2openwq, 1);
+        stream_vol_m3.assign(num_HRU, 0.0);
+        stream_hru_area_m2.assign(num_HRU, 0.0);
+
         // ---------------------------------------------------------------------
         // Define external water fluxes (EWF)
         // Use capital letters for external flux names
@@ -109,19 +119,23 @@ int CLASSWQ_openwq::decl(
         // OUTPUT block selects them via FLUXES_CONC_TO_PRINT). The coupler fills
         // the flux through-volume at runtime.
         // Each export is named EXACTLY after the SUMMA variable it reports.
-        // src = RUNOFF compartment for all of them, so the exported concentration
-        // is the soil-buffered runoff conc that mizuRoute ingests via EWF; they
-        // differ only in the flux through-volume (used for mass output).
+        // scalarRunoffVol_m3 draws its concentration from the RUNOFF
+        // compartment (surface runoff only). averageRoutedRunoff and
+        // scalarTotalRunoff draw it from the RUNOFF_TO_STREAM pool, so the
+        // exported concentration is that of ALL the water delivered to the
+        // stream, including the soil and aquifer baseflow. These two are the
+        // ones mizuRoute ingests via EWF; they differ only in the flux
+        // through-volume (used for mass output).
         // ---------------------------------------------------------------------
         OpenWQ_hostModelconfig_ref->add_FluxConcExport(
             scalarRunoffVol_fluxexp_openwq, "scalarRunoffVol_m3",
             runoff_index_openwq, num_HRU, nYdirec_2openwq, nRunoff_2openwq);
         OpenWQ_hostModelconfig_ref->add_FluxConcExport(
             averageRoutedRunoff_fluxexp_openwq, "averageRoutedRunoff",
-            runoff_index_openwq, num_HRU, nYdirec_2openwq, nRunoff_2openwq);
+            stream_index_openwq, num_HRU, nYdirec_2openwq, 1);
         OpenWQ_hostModelconfig_ref->add_FluxConcExport(
             scalarTotalRunoff_fluxexp_openwq, "scalarTotalRunoff",
-            runoff_index_openwq, num_HRU, nYdirec_2openwq, nRunoff_2openwq);
+            stream_index_openwq, num_HRU, nYdirec_2openwq, 1);
 
         // Initialize state variables container
         OpenWQ_vars_ref = std::make_unique<OpenWQ_vars>(
@@ -164,7 +178,8 @@ int CLASSWQ_openwq::decl(
             max_snow_layers,
             nRunoff_2openwq,
             nSoil_2openwq,
-            nAquifer_2openwq
+            nAquifer_2openwq,
+            1                    // RUNOFF_TO_STREAM pool
         };
 
         for (int cmp = 0; cmp < (int)OpenWQ_hostModelconfig_ref->get_num_HydroComp(); cmp++) {
@@ -295,6 +310,13 @@ int CLASSWQ_openwq::openwq_run_time_start(
     OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(
         aquifer_index_openwq, index_hru, 0, 0, aquiferWatVol_stateVar_summa_m3);
 
+    // RUNOFF_TO_STREAM is a transient pool like RUNOFF: no water at the start
+    // of the step, the delivered volume is set in openwq_set_fluxvol.
+    OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(
+        stream_index_openwq, index_hru, 0, 0, 0.0);
+    stream_vol_m3[index_hru] = 0.0;
+    stream_hru_area_m2[index_hru] = hru_area_m2;
+
     // -------------------------------------------------------------------------
     // Update snow layer volumes. Layers beyond the CURRENT snowpack are zeroed
     // explicitly: when the snowpack melts (nSnow -> 0) the stored volumes would
@@ -392,6 +414,28 @@ int CLASSWQ_openwq::openwq_run_space(
         simtime_summa[4],
         0);
 
+    // Every flux that SUMMA sends out of the domain (recipient == -1) is water
+    // delivered to the stream: surface runoff, exfiltration, soil-layer
+    // baseflow and aquifer baseflow. The transport below is left untouched, so
+    // the source compartments (and the sediment and sorbed species that leave
+    // with the surface runoff) behave exactly as before. The dissolved mass
+    // that the call removes from the source is then copied into the
+    // RUNOFF_TO_STREAM pool. The water volume of the pool is SUMMA's own total
+    // runoff (see openwq_set_fluxvol), not the sum of the fluxes seen here, so
+    // that concentration x runoff equals the mass delivered whatever set of
+    // fluxes the chosen groundwater parameterization sends out of the domain.
+    const bool to_stream = (recipient == -1)
+        && (source != stream_index_openwq)
+        && (ix_s >= 0) && (iy_s >= 0) && (iz_s >= 0);
+
+    std::vector<double> d_source_before;
+    if (to_stream) {
+        const auto& d_src = (*OpenWQ_vars_ref->d_chemass_dt_transp_diss)(source);
+        d_source_before.resize(d_src.n_elem);
+        for (unsigned int chemi = 0; chemi < d_src.n_elem; chemi++)
+            d_source_before[chemi] = d_src(chemi)(ix_s, iy_s, iz_s);
+    }
+
     OpenWQ_couplercalls_ref->RunSpaceStep(
         *OpenWQ_hostModelconfig_ref,
         *OpenWQ_json_ref,
@@ -413,6 +457,22 @@ int CLASSWQ_openwq::openwq_run_space(
         source, ix_s, iy_s, iz_s,
         recipient, ix_r, iy_r, iz_r,
         wflux_s2r, wmass_source);
+
+    if (to_stream) {
+        const auto& d_src = (*OpenWQ_vars_ref->d_chemass_dt_transp_diss)(source);
+        auto& d_pool = (*OpenWQ_vars_ref->d_chemass_dt_transp_diss)(stream_index_openwq);
+        auto& mb = OpenWQ_vars_ref->mass_balance;
+        for (unsigned int chemi = 0; chemi < d_src.n_elem; chemi++) {
+            // dissolved mass that this flux took out of the source cell
+            const double delivered = d_source_before[chemi] - d_src(chemi)(ix_s, iy_s, iz_s);
+            if (delivered <= 0.0) continue;
+            d_pool(chemi)(ix_s, 0, 0) += delivered;
+            // It has not left the domain yet: it does when the pool is emptied
+            // (openwq_run_time_end), where the tracker counts it again.
+            if (mb.initialized && chemi < mb.num_species)
+                mb.cumulative_out_flux[chemi] -= delivered;
+        }
+    }
 
     return 0;
 }
@@ -509,6 +569,13 @@ int CLASSWQ_openwq::openwq_set_fluxvol(
     OpenWQ_hostModelconfig_ref->set_fluxVol_hydromodel_at(
         iflux, ix - 1, iy - 1, iz - 1, flux_vol_m3);
 
+    // SUMMA's total runoff is the water delivered to the stream in this step:
+    // it is the volume of the RUNOFF_TO_STREAM pool (reported to openWQ in
+    // openwq_run_time_end).
+    if (iflux == scalarTotalRunoff_fluxexp_openwq
+            && ix >= 1 && ix <= (int) stream_vol_m3.size())
+        stream_vol_m3[ix - 1] = (flux_vol_m3 > 0.0) ? flux_vol_m3 : 0.0;
+
     return 0;
 }
 
@@ -533,6 +600,45 @@ int CLASSWQ_openwq::openwq_run_time_end(
         simtime_summa[3],
         simtime_summa[4],
         0);
+
+    // RUNOFF_TO_STREAM pool. Report the water delivered to the stream in this
+    // step (SUMMA's total runoff), so that the concentration printed for the
+    // pool and for the stream exports is delivered mass / delivered water, and
+    // concentration x total runoff returns the delivered mass. Empty the pool: the
+    // mass it holds at the start of the step is the delivery of the previous
+    // step and now leaves the domain (flux = volume, so the advected fraction
+    // is one).
+    // As for RUNOFF, numerical dribbles (< 0.001 mm over the HRU) are reported
+    // as no water instead of producing absurd concentrations.
+    for (int ihru = 0; ihru < num_HRU; ihru++) {
+        const double vol = stream_vol_m3[ihru];
+        const double vol_reported =
+            (vol >= 1.0e-6 * stream_hru_area_m2[ihru]) ? vol : 0.0;
+        OpenWQ_hostModelconfig_ref->set_waterVol_hydromodel_at(
+            stream_index_openwq, ihru, 0, 0, vol_reported);
+
+        OpenWQ_couplercalls_ref->RunSpaceStep(
+            *OpenWQ_hostModelconfig_ref,
+            *OpenWQ_json_ref,
+            *OpenWQ_wqconfig_ref,
+            *OpenWQ_units_ref,
+            *OpenWQ_utils_ref,
+            *OpenWQ_readjson_ref,
+            *OpenWQ_vars_ref,
+            *OpenWQ_initiate_ref,
+            *OpenWQ_TD_model_ref,
+            *OpenWQ_TS_model_ref,
+            *OpenWQ_LE_model_ref,
+            *OpenWQ_CH_model_ref,
+            *OpenWQ_SI_model_ref,
+            *OpenWQ_extwatflux_ss_ref,
+            *OpenWQ_solver_ref,
+            *OpenWQ_output_ref,
+            simtime,
+            stream_index_openwq, ihru, 0, 0,
+            -1, -1, -1, -1,
+            1.0, 1.0);
+    }
 
     OpenWQ_couplercalls_ref->RunTimeLoopEnd(
         *OpenWQ_hostModelconfig_ref,

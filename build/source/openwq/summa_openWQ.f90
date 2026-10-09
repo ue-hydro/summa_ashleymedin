@@ -463,6 +463,7 @@ subroutine openwq_run_space_step(summa1_struc)
    real(rkind)  :: averageRoutedRunoff_summa_m3   ! SUMMA routed runoff volume [m3/step] (flux-conc export)
    real(rkind)  :: scalarTotalRunoff_summa_m3     ! SUMMA total runoff volume  [m3/step] (flux-conc export)
    real(rkind)  :: scalarSurfaceRunoff_summa_m3
+   real(rkind)  :: scalarRainPlusMelt_summa_m3
    real(rkind)  :: scalarInfiltration_summa_m3
    real(rkind)  :: mLayerLiqFluxSnow_summa_m3
    real(rkind)  :: iLayerLiqFluxSoil_summa_m3
@@ -527,7 +528,8 @@ subroutine openwq_run_space_step(summa1_struc)
 
          RunoffVars: associate(&
             scalarSurfaceRunoff_m_s => fluxStruct%gru(iGRU)%hru(iHRU)%var(iLookFLUX%scalarSurfaceRunoff)%dat(1), &
-            scalarInfiltration_m_s  => fluxStruct%gru(iGRU)%hru(iHRU)%var(iLookFLUX%scalarInfiltration)%dat(1) &
+            scalarInfiltration_m_s  => fluxStruct%gru(iGRU)%hru(iHRU)%var(iLookFLUX%scalarInfiltration)%dat(1), &
+            scalarRainPlusMelt_m_s  => fluxStruct%gru(iGRU)%hru(iHRU)%var(iLookFLUX%scalarRainPlusMelt)%dat(1) &
          )
 
          Snow_SoilVars: associate(&
@@ -579,6 +581,7 @@ subroutine openwq_run_space_step(summa1_struc)
 
          ! Runoff
          scalarSurfaceRunoff_summa_m3 = scalarSurfaceRunoff_m_s * hru_area_m2 * data_step
+         scalarRainPlusMelt_summa_m3  = scalarRainPlusMelt_m_s  * hru_area_m2 * data_step
          scalarInfiltration_summa_m3  = scalarInfiltration_m_s  * hru_area_m2 * data_step
 
          ! Snow/Soil (unlayered)
@@ -594,8 +597,14 @@ subroutine openwq_run_space_step(summa1_struc)
          scalarAquiferBaseflow_summa_m3  = scalarAquiferBaseflow_summa_m_s * hru_area_m2 * data_step
          scalarAquiferTranspire_summa_m3 = scalarAquiferTranspire_summa_m_s * hru_area_m2 * data_step
 
-         ! Initialize runoff volume tracker
-         scalarRunoffVol_m3 = 0._rkind
+         ! NOTE on the interface fluxes. SUMMA allocates iLayerLiqFluxSnow as
+         ! (0:nSnow) and iLayerLiqFluxSoil as (0:nSoil): element k is the flux
+         ! at the BOTTOM of layer k and element 0 the flux at the top of the
+         ! snowpack or of the soil. The associate above takes the section
+         ! dat(:), whose lower bound is 1, so here the flux at the bottom of
+         ! layer k is element k + 1. The mid-layer arrays (mLayerDepth,
+         ! mLayerVolFracWat) hold the snow layers first and then the soil
+         ! layers, so soil layer k is element nSnow + k.
 
          ! ====================================================================
          ! 1. CANOPY FLUXES
@@ -623,7 +632,6 @@ subroutine openwq_run_space_step(summa1_struc)
             else
                OpenWQindex_r = runoff_index_openwq
                iz_r = 1
-               scalarRunoffVol_m3 = scalarRunoffVol_m3 + wflux_s2r
             end if
             err = openwq_obj%openwq_run_space( &
                simtime, &
@@ -648,7 +656,6 @@ subroutine openwq_run_space_step(summa1_struc)
          else
             OpenWQindex_r = runoff_index_openwq
             iz_r = 1
-            scalarRunoffVol_m3 = scalarRunoffVol_m3 + wflux_s2r
          end if
          err = openwq_obj%openwq_run_space_in( &
             simtime, 'PRECIP', &
@@ -668,7 +675,7 @@ subroutine openwq_run_space_step(summa1_struc)
                wmass_source = mLayerVolFracWat_summa_m3
                OpenWQindex_r = snow_index_openwq
                iz_r = iLayer + 1
-               mLayerLiqFluxSnow_summa_m3 = iLayerLiqFluxSnow_summa_m_s(iLayer) * hru_area_m2 * data_step
+               mLayerLiqFluxSnow_summa_m3 = iLayerLiqFluxSnow_summa_m_s(iLayer + 1) * hru_area_m2 * data_step
                wflux_s2r = mLayerLiqFluxSnow_summa_m3
                err = openwq_obj%openwq_run_space( &
                   simtime, &
@@ -678,15 +685,14 @@ subroutine openwq_run_space_step(summa1_struc)
             end do
 
             ! 2.4 Snow drainage (bottom layer) -> Runoff
-            mLayerLiqFluxSnow_summa_m3 = iLayerLiqFluxSnow_summa_m_s(nSnow) * hru_area_m2 * data_step
+            mLayerLiqFluxSnow_summa_m3 = iLayerLiqFluxSnow_summa_m_s(nSnow + 1) * hru_area_m2 * data_step
             wflux_s2r = mLayerLiqFluxSnow_summa_m3
             OpenWQindex_s = snow_index_openwq
-            iz_s = iLayer
+            iz_s = nSnow
             mLayerVolFracWat_summa_m3 = mLayerVolFracWat_summa_frac(nSnow) * hru_area_m2 * mLayerDepth_summa_m(nSnow)
             wmass_source = mLayerVolFracWat_summa_m3
             OpenWQindex_r = runoff_index_openwq
             iz_r = 1
-            scalarRunoffVol_m3 = scalarRunoffVol_m3 + wflux_s2r
             err = openwq_obj%openwq_run_space( &
                simtime, &
                OpenWQindex_s, hru_index, iy_s, iz_s, &
@@ -703,7 +709,6 @@ subroutine openwq_run_space_step(summa1_struc)
             wmass_source = mLayerVolFracWat_summa_m3
             OpenWQindex_r = runoff_index_openwq
             iz_r = 1
-            scalarRunoffVol_m3 = scalarRunoffVol_m3 + wflux_s2r
             err = openwq_obj%openwq_run_space( &
                simtime, &
                OpenWQindex_s, hru_index, iy_s, iz_s, &
@@ -715,26 +720,37 @@ subroutine openwq_run_space_step(summa1_struc)
          ! 3. RUNOFF FLUXES
          ! ====================================================================
 
-         ! 3.0 Report the runoff through-volume for this step. RUNOFF is a
-         ! transient pool (start-of-step volume is zero): sorption (model_SI)
-         ! and concentration outputs need the volume of water actually routed.
+         ! 3.0 Volume of the RUNOFF pool for this step. RUNOFF is a transient
+         ! pool (no water at the start of the step). Its through-volume is all
+         ! the liquid water that reached the soil surface, which is SUMMA's
+         ! scalarRainPlusMelt: rain and canopy drainage on snow-free ground, the
+         ! drainage from the base of the snowpack, and the melt of the "snow
+         ! without a layer". SUMMA splits it into infiltration and surface
+         ! runoff (scalarSurfaceRunoff = scalarRainPlusMelt - scalarInfiltration).
+         ! Sorption (model_SI) and the concentration outputs use this volume.
          ! Numerical dribbles (< 0.001 mm over the HRU) are reported as ZERO so
          ! those steps are masked as no-water instead of producing absurd
          ! concentrations (finite mass / vanishing volume).
+         scalarRunoffVol_m3 = max(scalarRainPlusMelt_summa_m3, 0._rkind)
          if (scalarRunoffVol_m3 >= 1.0e-6_rkind * hru_area_m2) then
             err = openwq_obj%openwq_update_runoff_vol(hru_index, scalarRunoffVol_m3)
          else
             err = openwq_obj%openwq_update_runoff_vol(hru_index, 0._rkind)
          end if
 
+         ! The pool keeps no water, so the solute it holds leaves with this
+         ! step's water, shared between infiltration and surface runoff in
+         ! proportion to the two fluxes: both calls below pass the pool
+         ! through-volume as the source volume, and the transport moves the
+         ! fraction flux/volume of the source mass.
+
          ! 3.1 Runoff -> Soil (infiltration)
-         wflux_s2r = scalarInfiltration_summa_m3
+         wflux_s2r = min(max(scalarInfiltration_summa_m3, 0._rkind), scalarRunoffVol_m3)
          OpenWQindex_s = runoff_index_openwq
          iz_s = 1
          wmass_source = scalarRunoffVol_m3
          OpenWQindex_r = soil_index_openwq
          iz_r = 1
-         scalarRunoffVol_m3 = scalarRunoffVol_m3 - wflux_s2r
          err = openwq_obj%openwq_run_space( &
             simtime, &
             OpenWQindex_s, hru_index, iy_s, iz_s, &
@@ -742,23 +758,31 @@ subroutine openwq_run_space_step(summa1_struc)
             wflux_s2r, wmass_source)
 
          ! 3.2 Runoff -> OUT (surface runoff leaving system)
+         wflux_s2r = min(max(scalarSurfaceRunoff_summa_m3, 0._rkind), scalarRunoffVol_m3)
          OpenWQindex_s = runoff_index_openwq
          iz_s = 1
          wmass_source = scalarRunoffVol_m3
          OpenWQindex_r = -1
          iz_r = -1
-         wflux_s2r = scalarRunoffVol_m3
          err = openwq_obj%openwq_run_space( &
             simtime, &
             OpenWQindex_s, hru_index, iy_s, iz_s, &
             OpenWQindex_r, hru_index, iy_r, iz_r, &
             wflux_s2r, wmass_source)
 
-         ! Report the runoff-to-stream through-volume for the RUNOFF_TO_STREAM
-         ! flux-conc export (index 0). openWQ prints conc = runoff_mass /
-         ! waterVol[RUNOFF] (the soil-buffered runoff concentration mizuRoute
-         ! ingests via EWF); mass (if requested) = conc * this stream volume.
-         ! Selected via FLUXES_CONC_TO_PRINT in the master file OUTPUT block.
+         ! Report the through-volumes of the flux-concentration exports, selected
+         ! via FLUXES_CONC_TO_PRINT in the master file OUTPUT block.
+         !   index 0 (scalarRunoffVol_m3): concentration of the RUNOFF pool, that
+         !     is, of the SURFACE runoff only.
+         !   index 1, 2 (averageRoutedRunoff, scalarTotalRunoff): concentration of
+         !     the RUNOFF_TO_STREAM pool, that is, of ALL the water delivered to
+         !     the stream. The hydrolink copies into that pool the solute of every
+         !     flux sent out of the domain below (recipient = -1): this surface
+         !     runoff, the exfiltration (4.2), the baseflow of each soil layer
+         !     (4.3) and the aquifer baseflow (5.1). Its volume is the total
+         !     runoff reported here (index 2). These are the exports a
+         !     river-routing model should ingest via EWF.
+         !   mass (if requested) = concentration * the volume reported here.
          ! Convert the SUMMA runoff-rate variables (m/s) to a per-step volume
          ! (m/s * area * dt). averageRoutedRunoff is a basin (GRU) variable.
          averageRoutedRunoff_summa_m3 = &
@@ -826,7 +850,7 @@ subroutine openwq_run_space_step(summa1_struc)
             wmass_source = mLayerVolFracWat_summa_m3
             OpenWQindex_r = soil_index_openwq
             iz_r = iLayer + 1
-            iLayerLiqFluxSoil_summa_m3 = iLayerLiqFluxSoil_summa_m_s(iLayer) * hru_area_m2 * data_step
+            iLayerLiqFluxSoil_summa_m3 = iLayerLiqFluxSoil_summa_m_s(iLayer + 1) * hru_area_m2 * data_step
             wflux_s2r = iLayerLiqFluxSoil_summa_m3
             err = openwq_obj%openwq_run_space( &
                simtime, &
@@ -838,7 +862,7 @@ subroutine openwq_run_space_step(summa1_struc)
          ! 4.6 Soil drainage -> Aquifer
          OpenWQindex_s = soil_index_openwq
          iz_s = nSoil
-         mLayerVolFracWat_summa_m3 = mLayerVolFracWat_summa_frac(nSoil) * hru_area_m2 * mLayerDepth_summa_m(nSoil)
+         mLayerVolFracWat_summa_m3 = mLayerVolFracWat_summa_frac(nSoil + nSnow) * hru_area_m2 * mLayerDepth_summa_m(nSoil + nSnow)
          wmass_source = mLayerVolFracWat_summa_m3
          OpenWQindex_r = aquifer_index_openwq
          iz_r = 1
@@ -880,6 +904,7 @@ subroutine openwq_run_space_step(summa1_struc)
 
    end associate summaVars
 end subroutine openwq_run_space_step
+
 
 
 ! ==============================================================================
